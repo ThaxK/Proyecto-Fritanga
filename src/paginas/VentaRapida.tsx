@@ -180,7 +180,7 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
         </div>
       </header>
 
-      <main className="flex-1 p-3 space-y-4 overflow-y-auto pb-80">
+      <main className="flex-1 p-3 space-y-4 overflow-y-auto pb-[200px]">
         {/* Grid de productos */}
         <section aria-label="Productos">
           <div className="grid grid-cols-2 gap-2">
@@ -218,32 +218,32 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
 
       {/* Contenedor fijo inferior: Carrito + Panel de pago */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-neutral-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
-        {/* Carrito */}
+        {/* Carrito - máximo 35dvh, scrollea si hay más */}
         {carrito.length > 0 && (
-          <section aria-label="Carrito actual" className="px-3 py-2 space-y-1 border-b border-neutral-100">
-            <h2 className="font-semibold flex justify-between text-sm">
+          <section aria-label="Carrito actual" className="px-3 pt-2 space-y-1 border-b border-neutral-100">
+            <h2 className="font-semibold flex justify-between text-xs">
               <span>Carrito ({carrito.reduce((s, i) => s + i.cantidad, 0)})</span>
               <span className="text-orange-600 font-bold">${total.toLocaleString()}</span>
             </h2>
-            <ul className="space-y-1 max-h-28 overflow-y-auto">
+            <ul className="space-y-1 max-h-[35dvh] overflow-y-auto overscroll-contain">
               {carrito.map(item => (
-                <li key={item.productoId} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg p-1.5">
+                <li key={item.productoId} className="flex items-center gap-1.5 text-sm bg-neutral-50 rounded-lg p-1.5">
                   <button
                     onClick={() => cambiarCantidad(item.productoId, -1)}
-                    className="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center active:bg-orange-200 text-sm font-bold"
+                    className="w-6 h-6 shrink-0 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center active:bg-orange-200 text-sm font-bold"
                     aria-label="Quitar uno"
                   >−</button>
-                  <span className="flex-1 text-center font-medium text-xs">{item.nombre} × {item.cantidad}</span>
-                  <span className="font-bold w-16 text-right text-xs">${(item.precio * item.cantidad).toLocaleString()}</span>
+                  <span className="flex-1 text-center font-medium text-xs truncate">{item.nombre} × {item.cantidad}</span>
+                  <span className="font-bold w-14 shrink-0 text-right text-xs">${(item.precio * item.cantidad).toLocaleString()}</span>
                   <button
                     onClick={() => cambiarCantidad(item.productoId, 1)}
                     disabled={item.cantidad >= item.stockDisponible}
-                    className="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center active:bg-orange-200 disabled:opacity-40 text-sm font-bold"
+                    className="w-6 h-6 shrink-0 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center active:bg-orange-200 disabled:opacity-40 text-sm font-bold"
                     aria-label="Agregar uno"
                   >+</button>
                   <button
                     onClick={() => eliminarDelCarrito(item.productoId)}
-                    className="w-7 h-7 rounded-full bg-red-50 text-red-600 flex items-center justify-center active:bg-red-100 text-xs"
+                    className="w-6 h-6 shrink-0 rounded-full bg-red-50 text-red-600 flex items-center justify-center active:bg-red-100 text-xs"
                     aria-label="Eliminar"
                   >🗑</button>
                 </li>
@@ -253,49 +253,50 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
         )}
 
         {/* Panel de pago */}
-        <section aria-label="Pago" className="px-3 pb-safe py-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <div className="bg-neutral-50 rounded-xl p-3 col-span-2">
-              <div className="text-xs text-neutral-500">TOTAL</div>
-              <div className="text-2xl font-bold text-orange-600">${total.toLocaleString()}</div>
+        <section aria-label="Pago" className="px-3 pb-safe pt-2 space-y-2">
+          {/* Fila única: TOTAL | RECIBIDO | VUELTO */}
+          <div className="grid grid-cols-3 gap-1.5 text-center">
+            <div className="bg-orange-50 rounded-lg py-1.5 px-1">
+              <div className="text-[10px] text-neutral-500 leading-tight">TOTAL</div>
+              <div className="text-lg font-bold text-orange-600 leading-tight">${total.toLocaleString()}</div>
             </div>
-            <div className="bg-neutral-50 rounded-xl p-3">
-              <div className="text-xs text-neutral-500">RECIBIDO</div>
-              <div className="text-2xl font-bold text-neutral-900">${recibido.toLocaleString()}</div>
+            <div className="bg-neutral-50 rounded-lg py-1.5 px-1">
+              <div className="text-[10px] text-neutral-500 leading-tight">RECIBIDO</div>
+              <div className="text-lg font-bold text-neutral-900 leading-tight">${recibido.toLocaleString()}</div>
             </div>
-            <div className={`rounded-xl p-3 ${vuelto >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-              <div className="text-xs text-neutral-500">VUELTO</div>
-              <div className={`text-2xl font-bold ${vuelto >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+            <div className={`rounded-lg py-1.5 px-1 ${vuelto >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className="text-[10px] text-neutral-500 leading-tight">VUELTO</div>
+              <div className={`text-lg font-bold leading-tight ${vuelto >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                 ${Math.abs(vuelto).toLocaleString()}
               </div>
             </div>
           </div>
 
           {/* Denominaciones */}
-          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Billetes rápidos">
+          <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Billetes rápidos">
             {DENOMS.map(d => (
               <button
                 key={d}
                 onClick={() => setRecibido(r => r + d)}
-                className="rounded-xl bg-orange-50 border border-orange-200 py-2 text-base font-semibold text-orange-700 active:bg-orange-100"
+                className="rounded-lg bg-orange-50 border border-orange-200 py-1.5 text-sm font-semibold text-orange-700 active:bg-orange-100"
               >
                 ${(d/1000).toFixed(0)}K
               </button>
             ))}
             <button
               onClick={() => setRecibido(total)}
-              className="rounded-xl bg-green-50 border border-green-200 py-2 text-base font-semibold text-green-700 active:bg-green-100 col-span-3"
+              className="rounded-lg bg-green-50 border border-green-200 py-1.5 text-sm font-semibold text-green-700 active:bg-green-100 col-span-3"
             >
               EXACTO (${total.toLocaleString()})
             </button>
           </div>
 
           {/* Acciones */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="grid grid-cols-2 gap-1.5">
             {esCuenta ? (
               <button
                 onClick={() => window.history.back()}
-                className="rounded-xl bg-blue-50 border border-blue-200 py-3 text-base font-semibold text-blue-700 active:bg-blue-100"
+                className="rounded-lg bg-blue-50 border border-blue-200 py-2.5 text-sm font-semibold text-blue-700 active:bg-blue-100"
               >
                 ← Cuentas
               </button>
@@ -303,7 +304,7 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
               <button
                 onClick={onAbrirCuenta}
                 disabled={carrito.length === 0}
-                className="rounded-xl bg-blue-50 border border-blue-200 py-3 text-base font-semibold text-blue-700 active:bg-blue-100 disabled:opacity-40"
+                className="rounded-lg bg-blue-50 border border-blue-200 py-2.5 text-sm font-semibold text-blue-700 active:bg-blue-100 disabled:opacity-40"
               >
                 → Cuenta
               </button>
@@ -311,7 +312,7 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
             <button
               onClick={handleCobrar}
               disabled={total === 0 || enviando}
-              className={`rounded-xl py-3 text-base font-semibold ${
+              className={`rounded-lg py-2.5 text-sm font-semibold ${
                 total > 0
                   ? 'bg-orange-500 text-white active:bg-orange-600'
                   : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
