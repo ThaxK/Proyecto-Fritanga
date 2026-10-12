@@ -225,7 +225,7 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
               <span>Carrito ({carrito.reduce((s, i) => s + i.cantidad, 0)})</span>
               <span className="text-orange-600 font-bold">${total.toLocaleString()}</span>
             </h2>
-            <ul className="space-y-1 max-h-[35dvh] overflow-y-auto overscroll-contain">
+            <ul className="space-y-1 max-h-[120px] overflow-y-auto overscroll-contain">
               {carrito.map(item => (
                 <li key={item.productoId} className="flex items-center gap-1.5 text-sm bg-neutral-50 rounded-lg p-1.5">
                   <button
