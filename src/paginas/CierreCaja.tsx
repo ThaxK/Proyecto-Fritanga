@@ -21,7 +21,7 @@ interface CierreData {
   efectivoFisico: number
   diferencia: number
   mermas: ConteoFisicoItem[]
-  abierta_el: string
+  abierto_el: string
 }
 
 export default function CierreCaja({ onVolver }: { onVolver: () => void }) {
@@ -78,20 +78,25 @@ const conteos = cierre.mermas.map(m => ({
   };
 
   // ----- Lógica de datos -----
-  const refrescar = useCallback(async () => {
+const refrescar = useCallback(async () => {
     if (!supabaseConfigurado) return
     try {
-      const { data: turnoAbierto, error: tErr } = await supabase!
+      const { data: turnos, error: tErr } = await supabase!
         .from('turno')
-        .select('id, base_inicial_cop, abierta_el')
+        .select('id, base_inicial_cop, abierto_el')
         .eq('estado', 'abierto')
         .order('id', { ascending: false })
         .limit(1)
-        .single()
-      if (tErr) throw tErr
-      if (!turnoAbierto) return
-
-      const t = turnoAbierto
+      if (tErr) {
+        console.error('Error consultando turno:', JSON.stringify(tErr, null, 2))
+        throw tErr
+      }
+      if (!turnos || turnos.length === 0) {
+        console.log('No hay turno abierto')
+        setCierre(null)
+        return
+      }
+      const t = turnos[0]
       const { data: mermasData, error: mErr } = await supabase!
         .from('v_stock_teorico')
         .select('producto_id, nombre, inicial, vendidos, teorico')
@@ -132,9 +137,9 @@ const conteos = cierre.mermas.map(m => ({
         entradas,
         dineroEsperado,
         efectivoFisico: 0,
-        diferencia: 0,
+diferencia: 0,
         mermas,
-        abierta_el: t.abierta_el
+        abierto_el: t.abierto_el
       })
     } catch (e) {
       setError('Error cargando datos de cierre: ' + (e as Error).message)
@@ -147,14 +152,29 @@ const conteos = cierre.mermas.map(m => ({
 
   useEffect(() => {
     if (!supabaseConfigurado || !cierre) return
+    let mounted = true
     let canal: any = null
+
+    // IMPORTANTE: agregar callbacks ANTES de subscribe()
     canal = supabase!
       .channel('cierre-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'venta' }, () => refrescar())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'movimiento_caja' }, () => refrescar())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'detalle_venta' }, () => refrescar())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'venta' }, () => {
+        if (mounted) refrescar()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'movimiento_caja' }, () => {
+        if (mounted) refrescar()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'detalle_venta' }, () => {
+        if (mounted) refrescar()
+      })
       .subscribe()
-    return () => { canal?.remove() }
+
+    return () => {
+      mounted = false
+      if (canal && typeof canal.unsubscribe === 'function') {
+        canal.unsubscribe()
+      }
+    }
   }, [refrescar, cierre])
 
   // Early returns

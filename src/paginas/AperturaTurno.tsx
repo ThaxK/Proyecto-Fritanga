@@ -51,18 +51,21 @@ export default function AperturaTurno({ onTurnoAbierto }: { onTurnoAbierto: () =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!supabaseConfigurado) { setError(avisoSinConexion); return }
-    if (totalUnidades === 0) { setError('Debes ingresar al menos 1 unidad en algún producto'); return }
     setEnviando(true)
     setError(null)
 
-    const conteos = productos
-      .filter(p => p.cantidad > 0)
-      .map(p => ({ producto_id: p.id, cantidad: p.cantidad }))
+    // Enviar TODOS los productos (incluyendo 0) - la BD exige conteo de todos los activos
+    const conteos = productos.map(p => ({ producto_id: p.id, cantidad: p.cantidad }))
 
     const { error } = await supabase!.rpc('fn_abrir_turno', {
       p_base_inicial_cop: baseInicial,
       p_conteos: conteos,
-      p_operador: localStorage.getItem('operador') || ''
+      p_operador: `Turno ${new Date().toLocaleDateString('es-CO', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })}`
     })
 
     if (error) setError('No se pudo abrir el turno: ' + error.message)
@@ -80,7 +83,17 @@ export default function AperturaTurno({ onTurnoAbierto }: { onTurnoAbierto: () =
 
   return (
     <div className="p-4 max-w-xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4 text-center">📅 Apertura de turno</h2>
+      <h2 className="text-2xl font-bold mb-2 text-center">📅 Apertura de turno</h2>
+
+      <div className="mb-4 p-3 rounded-xl bg-orange-50 border border-orange-200 text-center">
+        <div className="text-sm text-orange-700">Fecha del turno</div>
+        <div className="text-lg font-bold text-orange-600 capitalize">{new Date().toLocaleDateString('es-CO', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })}</div>
+      </div>
 
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm text-center" role="alert">

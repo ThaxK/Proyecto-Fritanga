@@ -694,6 +694,53 @@ begin
 end;
 $fn$;
 
+-- 5.7 Agregar stock durante el turno (reabastecimiento)
+create or replace function fn_agregar_stock(
+  p_producto_id bigint,
+  p_cantidad integer,
+  p_operador text default ''
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_turno_id bigint;
+  v_nuevo_total integer;
+begin
+  if p_producto_id is null or p_producto_id <= 0 then
+    raise exception 'PRODUCTO_INVALIDO: id inválido';
+  end if;
+  if p_cantidad is null or p_cantidad <= 0 then
+    raise exception 'CANTIDAD_INVALIDA: debe ser mayor que cero';
+  end if;
+  if not exists (select 1 from producto where id = p_producto_id) then
+    raise exception 'PRODUCTO_NO_EXISTE';
+  end if;
+
+  -- bloqueo de concurrencia
+  select id into v_turno_id
+  from turno where estado = 'abierto'
+  order by id limit 1 for update;
+  if v_turno_id is null then
+    raise exception 'TURNO_CERRADO: no hay turno abierto';
+  end if;
+
+  -- insertar o actualizar el conteo inicial del producto
+  insert into conteo_inicial (turno_id, producto_id, cantidad)
+  values (v_turno_id, p_producto_id, p_cantidad)
+  on conflict (turno_id, producto_id)
+  do update set cantidad = conteo_inicial.cantidad + excluded.cantidad
+  returning cantidad into v_nuevo_total;
+
+  return jsonb_build_object(
+    'producto_id', p_producto_id,
+    'cantidad_agregada', p_cantidad,
+    'nuevo_total', v_nuevo_total
+  );
+end;
+$fn$;
+
 -- 5.6 Cierre de turno (RF2 + RF5): conteo físico, mermas y cuadre
 --     p_conteos_fisicos: [{"producto_id": 1, "cantidad": 12}, ...]
 create or replace function fn_cerrar_turno(

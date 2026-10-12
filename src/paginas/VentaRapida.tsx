@@ -20,7 +20,13 @@ interface ProductoConStock {
   stock: number
 }
 
-export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => void }) {
+interface VentaRapidaProps {
+  onAbrirCuenta: () => void
+  cuentaId?: number
+  cuentaEtiqueta?: string
+}
+
+export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }: VentaRapidaProps) {
   const [productos, setProductos] = useState<ProductoConStock[]>([])
   const [carrito, setCarrito] = useState<CarritoItem[]>([])
   const [recibido, setRecibido] = useState(0)
@@ -30,6 +36,10 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
 
   const total = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0)
   const vuelto = recibido - total
+  const esCuenta = cuentaId != null
+
+  // Denominaciones de billetes
+  const DENOMS = [2000, 5000, 10000, 20000, 50000]
 
   // ----- Cargar productos + stock inicial -----
   const refrescarStock = useCallback(async () => {
@@ -56,6 +66,8 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
     }
   }, [])
 
+  useEffect(() => { refrescarStock() }, [refrescarStock])
+
   // ----- Suscripción Realtime a ventas para actualizar stock -----
   useEffect(() => {
     if (!supabaseConfigurado) return
@@ -75,10 +87,7 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
       .subscribe()
 
     return () => { supabase!.removeChannel(canal) }
-  }, [refrescarStock])
-
-  // Carga inicial
-  useEffect(() => { refrescarStock() }, [refrescarStock])
+  }, [])
 
   // ----- Handlers del carrito -----
   const agregarAlCarrito = (prod: ProductoConStock) => {
@@ -112,13 +121,12 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
     setCarrito(prev => prev.filter(i => i.productoId !== id))
   }
 
-  // ----- Denominaciones -----
-  const DENOMS = [2000, 5000, 10000, 20000, 50000]
-
   // ----- Enviar a RPC -----
   const handleCobrar = async () => {
-    const totalLocal = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0)
-    if (totalLocal === 0 || recibido < totalLocal || enviando) return
+    if (total === 0 || enviando) return
+    // recibido es opcional: si es 0 o < total, asumimos pago exacto (vuelto = 0)
+    const recibidoFinal = recibido >= total ? recibido : total
+
     setEnviando(true)
     setError(null)
 
@@ -126,9 +134,9 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
 
     const { error } = await supabase!.rpc('fn_registrar_venta', {
       p_items: items,
-      p_recibido_cop: recibido,
+      p_recibido_cop: recibidoFinal,
       p_client_tx_id: crypto.randomUUID(),
-      p_cuenta_id: null,
+      p_cuenta_id: cuentaId ?? null,
       p_operador: localStorage.getItem('operador') || ''
     })
 
@@ -136,6 +144,10 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
     else {
       setCarrito([])
       setRecibido(0)
+      // Si estábamos en modo cuenta, limpiar hash para volver a venta normal
+      if (esCuenta) {
+        window.location.hash = ''
+      }
     }
     setEnviando(false)
   }
@@ -149,17 +161,26 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
   }
 
   return (
-    <div className="flex flex-col min-h-full pb-24">
+    <div className="flex flex-col min-h-full">
       {/* Header compacto */}
       <header className="sticky top-0 z-10 bg-white px-3 py-2 shadow-sm flex items-center justify-between">
-        <h1 className="font-bold text-lg">🛒 Venta rápida</h1>
-        <div className="text-xs text-neutral-500 flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500" aria-label="Conectado"></span>
-          En vivo
+        <div className="flex items-center gap-2 flex-1">
+          {esCuenta ? (
+            <button onClick={() => window.history.back()} className="text-orange-600 font-medium text-sm">← Cuentas</button>
+          ) : (
+            <span></span>
+          )}
+          <h1 className="font-bold text-lg flex-1 text-center">
+            {esCuenta ? `🧾 ${cuentaEtiqueta}` : '🛒 Venta rápida'}
+          </h1>
+          <div className="text-xs text-neutral-500 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-green-500" aria-label="Conectado"></span>
+            En vivo
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 p-3 space-y-4 overflow-y-auto">
+      <main className="flex-1 p-3 space-y-4 overflow-y-auto pb-80">
         {/* Grid de productos */}
         <section aria-label="Productos">
           <div className="grid grid-cols-2 gap-2">
@@ -229,7 +250,7 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
         )}
 
         {/* Panel de pago */}
-        <section aria-label="Pago" className="bg-white rounded-xl p-3 shadow-sm space-y-3">
+        <section aria-label="Pago" className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-neutral-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] px-3 pb-safe py-3 space-y-3">
           <div className="grid grid-cols-2 gap-2 text-center">
             <div className="bg-neutral-50 rounded-xl p-3 col-span-2">
               <div className="text-xs text-neutral-500">TOTAL</div>
@@ -268,23 +289,36 @@ export default function VentaRapida({ onAbrirCuenta }: { onAbrirCuenta: () => vo
 
           {/* Acciones */}
           <div className="grid grid-cols-2 gap-2 pt-1">
-            <button
-              onClick={onAbrirCuenta}
-              disabled={carrito.length === 0}
-              className="rounded-xl bg-blue-50 border border-blue-200 py-3 text-base font-semibold text-blue-700 active:bg-blue-100 disabled:opacity-40"
-            >
-              → Cuenta
-            </button>
+            {esCuenta ? (
+              <button
+                onClick={() => window.history.back()}
+                className="rounded-xl bg-blue-50 border border-blue-200 py-3 text-base font-semibold text-blue-700 active:bg-blue-100"
+              >
+                ← Cuentas
+              </button>
+            ) : (
+              <button
+                onClick={onAbrirCuenta}
+                disabled={carrito.length === 0}
+                className="rounded-xl bg-blue-50 border border-blue-200 py-3 text-base font-semibold text-blue-700 active:bg-blue-100 disabled:opacity-40"
+              >
+                → Cuenta
+              </button>
+            )}
             <button
               onClick={handleCobrar}
-              disabled={total === 0 || recibido < total || enviando}
+              disabled={total === 0 || enviando}
               className={`rounded-xl py-3 text-base font-semibold ${
-                total > 0 && recibido >= total
+                total > 0
                   ? 'bg-orange-500 text-white active:bg-orange-600'
                   : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
               }`}
             >
-              {enviando ? 'Cobrando…' : `Cobrar ${recibido > 0 ? `($${(recibido - total).toLocaleString()})` : ''}`}
+              {enviando
+                ? 'Procesando…'
+                : esCuenta
+                  ? `Agregar a la cuenta${recibido > 0 ? ` (vuelto $${(recibido - total).toLocaleString()})` : ''}`
+                  : `Cobrar${recibido > 0 ? ` (vuelto $${(recibido - total).toLocaleString()})` : ''}`}
             </button>
           </div>
 
