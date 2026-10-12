@@ -214,33 +214,36 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
               ))}
           </div>
         </section>
+      </main>
 
+      {/* Contenedor fijo inferior: Carrito + Panel de pago */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-neutral-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
         {/* Carrito */}
         {carrito.length > 0 && (
-          <section aria-label="Carrito actual" className="bg-white rounded-xl p-3 shadow-sm space-y-2">
-            <h2 className="font-semibold flex justify-between">
-              Carrito ({carrito.reduce((s, i) => s + i.cantidad, 0)})
+          <section aria-label="Carrito actual" className="px-3 py-2 space-y-1 border-b border-neutral-100">
+            <h2 className="font-semibold flex justify-between text-sm">
+              <span>Carrito ({carrito.reduce((s, i) => s + i.cantidad, 0)})</span>
               <span className="text-orange-600 font-bold">${total.toLocaleString()}</span>
             </h2>
-            <ul className="space-y-1 max-h-40 overflow-y-auto">
+            <ul className="space-y-1 max-h-28 overflow-y-auto">
               {carrito.map(item => (
-                <li key={item.productoId} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg p-2">
+                <li key={item.productoId} className="flex items-center gap-2 text-sm bg-neutral-50 rounded-lg p-1.5">
                   <button
                     onClick={() => cambiarCantidad(item.productoId, -1)}
-                    className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center active:bg-orange-200"
+                    className="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center active:bg-orange-200 text-sm font-bold"
                     aria-label="Quitar uno"
                   >−</button>
-                  <span className="flex-1 text-center font-medium">{item.nombre} × {item.cantidad}</span>
-                  <span className="font-bold w-20 text-right">${(item.precio * item.cantidad).toLocaleString()}</span>
+                  <span className="flex-1 text-center font-medium text-xs">{item.nombre} × {item.cantidad}</span>
+                  <span className="font-bold w-16 text-right text-xs">${(item.precio * item.cantidad).toLocaleString()}</span>
                   <button
                     onClick={() => cambiarCantidad(item.productoId, 1)}
                     disabled={item.cantidad >= item.stockDisponible}
-                    className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center active:bg-orange-200 disabled:opacity-40"
+                    className="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center active:bg-orange-200 disabled:opacity-40 text-sm font-bold"
                     aria-label="Agregar uno"
                   >+</button>
                   <button
                     onClick={() => eliminarDelCarrito(item.productoId)}
-                    className="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center active:bg-red-100"
+                    className="w-7 h-7 rounded-full bg-red-50 text-red-600 flex items-center justify-center active:bg-red-100 text-xs"
                     aria-label="Eliminar"
                   >🗑</button>
                 </li>
@@ -250,11 +253,11 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
         )}
 
         {/* Panel de pago */}
-        <section aria-label="Pago" className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-neutral-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] px-3 pb-safe py-3 space-y-3">
+        <section aria-label="Pago" className="px-3 pb-safe py-3 space-y-3">
           <div className="grid grid-cols-2 gap-2 text-center">
             <div className="bg-neutral-50 rounded-xl p-3 col-span-2">
               <div className="text-xs text-neutral-500">TOTAL</div>
-              <div className="text-3xl font-bold text-orange-600">${total.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-orange-600">${total.toLocaleString()}</div>
             </div>
             <div className="bg-neutral-50 rounded-xl p-3">
               <div className="text-xs text-neutral-500">RECIBIDO</div>
@@ -326,7 +329,7 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
             <p className="text-center text-red-600 text-sm" role="alert">{error}</p>
           )}
         </section>
-      </main>
+      </div>
     </div>
   )
 }
