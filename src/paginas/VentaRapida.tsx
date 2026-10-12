@@ -198,10 +198,10 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
       })
       if (errorVenta) throw errorVenta
 
-      // 4. Navegar al detalle de la cuenta
+      // 4. Volver a la venta normal (sin hash ni cuenta seleccionada)
       setCarrito([])
       setRecibido(0)
-      window.location.hash = `#venta/${cuentaIdNueva}/${encodeURIComponent(`Cuenta ${numero}`)}`
+      window.location.hash = ''
     } catch (e) {
       setError('Error: ' + (e as Error).message)
     }
