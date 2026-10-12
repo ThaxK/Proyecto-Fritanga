@@ -145,7 +145,6 @@ export default function App() {
 
       <main className="flex-1 pb-20">
         {pantalla === 'venta' && <VentaRapida 
-          onAbrirCuenta={() => { setPantalla('cuentas'); window.location.hash = ''; setCuentaId(null); setCuentaEtiqueta(null); }}
           cuentaId={cuentaId ?? undefined}
           cuentaEtiqueta={cuentaEtiqueta ?? undefined}
         />}

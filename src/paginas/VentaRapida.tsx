@@ -21,12 +21,11 @@ interface ProductoConStock {
 }
 
 interface VentaRapidaProps {
-  onAbrirCuenta: () => void
   cuentaId?: number
   cuentaEtiqueta?: string
 }
 
-export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }: VentaRapidaProps) {
+export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaProps) {
   const [productos, setProductos] = useState<ProductoConStock[]>([])
   const [carrito, setCarrito] = useState<CarritoItem[]>([])
   const [recibido, setRecibido] = useState(0)
@@ -132,22 +131,79 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
 
     const items = carrito.map(i => ({ producto_id: i.productoId, cantidad: i.cantidad }))
 
+    // Si estamos en modo cuenta existente, solo registrar la venta
+    if (esCuenta && cuentaId) {
+      const { error } = await supabase!.rpc('fn_registrar_venta', {
+        p_items: items,
+        p_recibido_cop: recibidoFinal,
+        p_client_tx_id: crypto.randomUUID(),
+        p_cuenta_id: cuentaId,
+        p_operador: localStorage.getItem('operador') || ''
+      })
+      if (error) setError('Error: ' + error.message)
+      else {
+        setCarrito([])
+        setRecibido(0)
+        window.location.hash = ''
+      }
+      setEnviando(false)
+      return
+    }
+
+    // Modo mostrador: registrar venta directa (sin cuenta)
     const { error } = await supabase!.rpc('fn_registrar_venta', {
       p_items: items,
       p_recibido_cop: recibidoFinal,
       p_client_tx_id: crypto.randomUUID(),
-      p_cuenta_id: cuentaId ?? null,
+      p_cuenta_id: null,
       p_operador: localStorage.getItem('operador') || ''
     })
-
     if (error) setError('Error: ' + error.message)
     else {
       setCarrito([])
       setRecibido(0)
-      // Si estábamos en modo cuenta, limpiar hash para volver a venta normal
-      if (esCuenta) {
-        window.location.hash = ''
-      }
+    }
+    setEnviando(false)
+  }
+
+  // ----- Crear cuenta con los productos del carrito -----
+  const handleCrearCuenta = async () => {
+    if (carrito.length === 0 || enviando) return
+    setEnviando(true)
+    setError(null)
+
+    try {
+      // 1. Contar cuentas abiertas para generar nombre secuencial
+      const { count } = await supabase!
+        .from('cuenta')
+        .select('id', { count: 'exact', head: true })
+        .eq('estado', 'abierta')
+      const numero = (count ?? 0) + 1
+
+      // 2. Crear la cuenta
+      const { data: cuentaIdNueva, error: errorCuenta } = await supabase!.rpc('fn_crear_cuenta', {
+        p_etiqueta: `Cuenta ${numero}`,
+        p_operador: localStorage.getItem('operador') || ''
+      })
+      if (errorCuenta) throw errorCuenta
+
+      // 3. Registrar los items del carrito como venta tipo 'cuenta'
+      const items = carrito.map(i => ({ producto_id: i.productoId, cantidad: i.cantidad }))
+      const { error: errorVenta } = await supabase!.rpc('fn_registrar_venta', {
+        p_items: items,
+        p_recibido_cop: 0,
+        p_client_tx_id: crypto.randomUUID(),
+        p_cuenta_id: cuentaIdNueva,
+        p_operador: localStorage.getItem('operador') || ''
+      })
+      if (errorVenta) throw errorVenta
+
+      // 4. Navegar al detalle de la cuenta
+      setCarrito([])
+      setRecibido(0)
+      window.location.hash = `#venta/${cuentaIdNueva}/${encodeURIComponent(`Cuenta ${numero}`)}`
+    } catch (e) {
+      setError('Error: ' + (e as Error).message)
     }
     setEnviando(false)
   }
@@ -302,11 +358,11 @@ export default function VentaRapida({ onAbrirCuenta, cuentaId, cuentaEtiqueta }:
               </button>
             ) : (
               <button
-                onClick={onAbrirCuenta}
-                disabled={carrito.length === 0}
+                onClick={handleCrearCuenta}
+                disabled={carrito.length === 0 || enviando}
                 className="rounded-lg bg-blue-50 border border-blue-200 py-2.5 text-sm font-semibold text-blue-700 active:bg-blue-100 disabled:opacity-40"
               >
-                → Cuenta
+                {enviando ? 'Creando…' : '→ Cuenta'}
               </button>
             )}
             <button

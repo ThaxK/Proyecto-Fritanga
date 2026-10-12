@@ -15,7 +15,6 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creando, setCreando] = useState(false)
-  const [nuevaEtiqueta, setNuevaEtiqueta] = useState('')
   
   // Estado para el modal de cobro
   const [cuentaCobrando, setCuentaCobrando] = useState<{ id: number; etiqueta: string; items: CuentaItem[]; total: number } | null>(null)
@@ -85,20 +84,20 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
   }, [refrescar])
 
   const handleCrearCuenta = async () => {
-    const etiqueta = nuevaEtiqueta.trim()
-    if (!etiqueta) return
     setCreando(true)
     setError(null)
 
-    const { error } = await supabase!.rpc('fn_crear_cuenta', {
-      p_etiqueta: etiqueta,
-      p_operador: localStorage.getItem('operador') || ''
-    })
-
-    if (error) setError('Error: ' + error.message)
-    else {
-      setNuevaEtiqueta('')
+    try {
+      // Generar nombre secuencial: "Cuenta 1", "Cuenta 2", ...
+      const numero = cuentas.length + 1
+      const { error } = await supabase!.rpc('fn_crear_cuenta', {
+        p_etiqueta: `Cuenta ${numero}`,
+        p_operador: localStorage.getItem('operador') || ''
+      })
+      if (error) throw error
       refrescar()
+    } catch (e) {
+      setError('Error: ' + (e as Error).message)
     }
     setCreando(false)
   }
@@ -251,24 +250,13 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
       <main className="flex-1 p-3 space-y-4 overflow-y-auto">
         {/* Crear nueva cuenta */}
         <section className="bg-white rounded-xl p-3 shadow-sm space-y-2">
-          <h2 className="font-semibold">Nueva cuenta</h2>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={nuevaEtiqueta}
-              onChange={e => setNuevaEtiqueta(e.target.value)}
-              placeholder="Ej: Mesa 1, Cliente chaqueta roja..."
-              className="flex-1 rounded-xl border-2 border-neutral-300 bg-white px-4 py-3 text-base focus:border-orange-500 focus:outline-none"
-              autoFocus
-            />
-            <button
-              onClick={handleCrearCuenta}
-              disabled={creando || nuevaEtiqueta.trim() === ''}
-              className="rounded-xl bg-orange-500 px-4 py-3 text-base font-semibold text-white active:bg-orange-600 disabled:opacity-40"
-            >
-              {creando ? 'Creando…' : 'Crear'}
-            </button>
-          </div>
+          <button
+            onClick={handleCrearCuenta}
+            disabled={creando}
+            className="w-full rounded-xl bg-orange-500 px-4 py-3 text-base font-semibold text-white active:bg-orange-600 disabled:opacity-40"
+          >
+            {creando ? 'Creando…' : `+ Nueva cuenta (Cuenta ${cuentas.length + 1})`}
+          </button>
           {error && <p className="text-red-600 text-sm">{error}</p>}
         </section>
 
