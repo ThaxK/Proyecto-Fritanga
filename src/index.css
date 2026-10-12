@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Estilos base: fondo claro, tipografía grande para uso en mostrador */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-neutral-100 text-neutral-900 antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
