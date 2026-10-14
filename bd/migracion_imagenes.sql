@@ -6,7 +6,11 @@ alter table producto
   add column if not exists imagen_url text not null default '';
 
 -- 2. Vista v_stock_teorico expone imagen_url
-create or replace view v_stock_teorico as
+-- (CREATE OR REPLACE no permite reordenar columnas, hay que dropearla primero;
+--  ningún objeto de la BD depende de esta vista)
+drop view if exists v_stock_teorico;
+
+create view v_stock_teorico as
 select
   t.id as turno_id,
   p.id as producto_id,

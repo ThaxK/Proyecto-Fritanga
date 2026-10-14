@@ -184,7 +184,9 @@ end $$;
 -- ============================================================
 
 -- Stock teórico del turno abierto (RF2): inicial - vendidos
-create or replace view v_stock_teorico as
+-- Se dropea y recrea porque CREATE OR REPLACE no permite reordenar columnas
+drop view if exists v_stock_teorico;
+create view v_stock_teorico as
 select
   t.id as turno_id,
   p.id as producto_id,
