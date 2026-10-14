@@ -15,6 +15,7 @@ select
   t.id as turno_id,
   p.id as producto_id,
   p.nombre,
+  p.precio_cop,
   p.orden,
   p.imagen_url,
   coalesce(ci.cantidad, 0) as inicial,
