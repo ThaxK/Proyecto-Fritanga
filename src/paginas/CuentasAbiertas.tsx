@@ -180,6 +180,46 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
     setErrorCobro(null)
   }
 
+  // Restar un item de la cuenta antes de cobrar
+  const [restando, setRestando] = useState(false)
+  const handleRestarItem = async (productoId: number) => {
+    if (!cuentaCobrando || restando) return
+    setRestando(true)
+    setErrorCobro(null)
+
+    try {
+      // Verificar cuántas hay de este producto
+      const item = cuentaCobrando.items.find(i => i.producto_id === productoId)
+      if (!item) return
+
+      const { error } = await supabase!.rpc('fn_restar_item_cuenta', {
+        p_cuenta_id: cuentaCobrando.id,
+        p_producto_id: productoId,
+        p_cantidad: 1
+      })
+      if (error) throw error
+
+      // Recalcular items locales
+      const nuevosItems = cuentaCobrando.items
+        .map(i => i.producto_id === productoId
+          ? { ...i, cantidad: i.cantidad - 1, subtotal: (i.cantidad - 1) * i.precio_unit_cop }
+          : i)
+        .filter(i => i.cantidad > 0)
+
+      const nuevoTotal = nuevosItems.reduce((s, i) => s + i.subtotal, 0)
+
+      setCuentaCobrando({
+        ...cuentaCobrando,
+        items: nuevosItems,
+        total: nuevoTotal
+      })
+      setRecibidoCobro(nuevoTotal)
+    } catch (e) {
+      setErrorCobro('Error: ' + (e as Error).message)
+    }
+    setRestando(false)
+  }
+
   const handleCobrarFinal = async () => {
     if (!cuentaCobrando || cobrando) return
     const total = cuentaCobrando.total
@@ -325,7 +365,13 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
             {/* Detalle de items */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[50vh]">
               {cuentaCobrando.items.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0">
+                <div key={idx} className="flex items-center gap-2 py-2 border-b last:border-0">
+                  <button
+                    onClick={() => handleRestarItem(item.producto_id)}
+                    disabled={restando}
+                    className="w-7 h-7 shrink-0 rounded-full bg-red-50 text-red-600 flex items-center justify-center active:bg-red-100 disabled:opacity-40 font-bold"
+                    aria-label={`Restar ${item.nombre}`}
+                  >−</button>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{item.nombre}</div>
                     <div className="text-xs text-neutral-500">{item.cantidad} × ${item.precio_unit_cop.toLocaleString()}</div>
@@ -333,6 +379,9 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
                   <span className="font-semibold text-orange-600">${item.subtotal.toLocaleString()}</span>
                 </div>
               ))}
+              {cuentaCobrando.items.length === 0 && (
+                <p className="text-center text-neutral-500 text-sm py-4">No hay items en esta cuenta</p>
+              )}
               <div className="pt-2 border-t font-bold text-right text-lg">
                 Total: ${cuentaCobrando.total.toLocaleString()}
               </div>
