@@ -40,6 +40,19 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
   // Denominaciones de billetes
   const DENOMS = [2000, 5000, 10000, 20000, 50000]
 
+  // Emoji por producto (nombre en minúsculas)
+  const EMOJIS: Record<string, string> = {
+    'empanadas': '🥟',
+    'papas rellenas': '🥔',
+    'marranitas': '🍌',
+    'café': '☕',
+    'cafe': '☕',
+    'café con leche': '☕',
+    'cafe con leche': '☕',
+    'gaseosa': '🥤',
+  }
+  const emojiDe = (nombre: string) => EMOJIS[nombre.toLowerCase()] || '🍽️'
+
   // ----- Cargar productos + stock inicial -----
   const refrescarStock = useCallback(async () => {
     if (!supabaseConfigurado) return
@@ -255,7 +268,8 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
                   style={{ minHeight: '88px' }}
                 >
                   <div className="p-2 text-center">
-                    <div className="font-semibold text-base">{p.nombre}</div>
+                    <div className="text-3xl mb-1">{emojiDe(p.nombre)}</div>
+                    <div className="font-semibold text-sm">{p.nombre}</div>
                     <div className="text-sm text-orange-600 font-bold">${p.precioCop.toLocaleString()}</div>
                   </div>
                   {p.stock <= 0 && (
