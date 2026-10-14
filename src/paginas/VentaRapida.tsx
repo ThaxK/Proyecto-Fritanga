@@ -16,6 +16,7 @@ interface ProductoConStock {
   nombre: string
   precioCop: number
   orden: number
+  imagenUrl: string
   activo: boolean
   stock: number
 }
@@ -59,7 +60,7 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
     try {
       const { data, error } = await supabase!
         .from('v_stock_teorico')
-        .select('producto_id, nombre, precio_cop, orden, inicial, vendidos, teorico')
+        .select('producto_id, nombre, precio_cop, orden, imagen_url, inicial, vendidos, teorico')
         .order('orden')
       if (error) throw error
       const conStock = (data ?? []).map(d => ({
@@ -67,6 +68,7 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
         nombre: d.nombre,
         precioCop: d.precio_cop,
         orden: d.orden,
+        imagenUrl: d.imagen_url ?? '',
         stock: d.teorico,
         activo: true
       }))
@@ -268,7 +270,16 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
                   style={{ minHeight: '88px' }}
                 >
                   <div className="p-2 text-center">
-                    <div className="text-3xl mb-1">{emojiDe(p.nombre)}</div>
+                    {p.imagenUrl ? (
+                      <img
+                        src={p.imagenUrl}
+                        alt={p.nombre}
+                        loading="lazy"
+                        className="w-12 h-12 mx-auto mb-1 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="text-3xl mb-1">{emojiDe(p.nombre)}</div>
+                    )}
                     <div className="font-semibold text-sm">{p.nombre}</div>
                     <div className="text-sm text-orange-600 font-bold">${p.precioCop.toLocaleString()}</div>
                   </div>

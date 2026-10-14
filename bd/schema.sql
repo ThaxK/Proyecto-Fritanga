@@ -35,7 +35,8 @@ create table if not exists producto (
   nombre text not null,
   precio_cop integer not null check (precio_cop >= 0),
   orden integer not null default 0,
-  activo boolean not null default true
+  activo boolean not null default true,
+  imagen_url text not null default ''
 );
 
 create table if not exists turno (
@@ -189,6 +190,7 @@ select
   p.id as producto_id,
   p.nombre,
   p.orden,
+  p.imagen_url,
   coalesce(ci.cantidad, 0) as inicial,
   coalesce(vd.vendidos, 0) as vendidos,
   coalesce(ci.cantidad, 0) - coalesce(vd.vendidos, 0) as teorico
@@ -990,16 +992,16 @@ on conflict (id) do nothing;
 
 -- Catálogo base con PRECIOS DE EJEMPLO:
 --   ajústalos aquí (re-ejecuta este INSERT) o desde Supabase Studio
-insert into producto (nombre, precio_cop, orden)
-select v.nombre, v.precio_cop, v.orden
+insert into producto (nombre, precio_cop, orden, imagen_url)
+select v.nombre, v.precio_cop, v.orden, v.imagen_url
 from (values
-  ('Empanadas',      2000, 1),
-  ('Papas rellenas', 2500, 2),
-  ('Marranitas',     2500, 3),
-  ('Café',           1500, 4),
-  ('Café con leche', 2000, 5),
-  ('Gaseosa',        3000, 6)
-) as v(nombre, precio_cop, orden)
+  ('Empanadas',      2000, 1, 'https://images.unsplash.com/photo-1556280725-d0a1d82c811b?w=400&h=400&fit=crop'),
+  ('Papas rellenas', 2500, 2, 'https://images.unsplash.com/photo-1559847844-b0915a3800c6?w=400&h=400&fit=crop'),
+  ('Marranitas',     2500, 3, 'https://images.unsplash.com/photo-1540714605746-4f474eefc6d4?w=400&h=400&fit=crop'),
+  ('Café',           1500, 4, 'https://images.unsplash.com/photo-1594736130597-11a78f1f575b?w=400&h=400&fit=crop'),
+  ('Café con leche', 2000, 5, 'https://images.unsplash.com/photo-1573074699584-303c79998c3a?w=400&h=400&fit=crop'),
+  ('Gaseosa',        3000, 6, 'https://images.unsplash.com/photo-1567705323043-d0e489de300d?w=400&h=400&fit=crop')
+) as v(nombre, precio_cop, orden, imagen_url)
 where not exists (
   select 1 from producto p
   where lower(p.nombre) = lower(v.nombre) and p.activo
