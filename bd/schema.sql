@@ -714,6 +714,7 @@ declare
   v_restante integer := p_cantidad;
   v_detalle record;
   v_total_cuenta integer;
+  v_cuenta_eliminada boolean := false;
 begin
   if p_cantidad is null or p_cantidad <= 0 then
     raise exception 'CANTIDAD_INVALIDA: la cantidad a restar debe ser mayor a 0';
@@ -775,7 +776,20 @@ begin
   select coalesce(sum(total_cop), 0) into v_total_cuenta
   from venta where cuenta_id = p_cuenta_id and tipo = 'cuenta';
 
-  return jsonb_build_object('total_cuenta', v_total_cuenta);
+  -- si la cuenta quedó sin items, eliminarla
+  -- (las ventas tipo 'cuenta' vacías ya se eliminaron arriba; ninguna otra
+  --  la referencia mientras esté abierta, así que la FK de venta se respeta)
+  v_cuenta_eliminada := not exists (
+    select 1 from venta v where v.cuenta_id = p_cuenta_id
+  );
+  if v_cuenta_eliminada then
+    delete from cuenta where id = p_cuenta_id;
+  end if;
+
+  return jsonb_build_object(
+    'total_cuenta', v_total_cuenta,
+    'cuenta_eliminada', v_cuenta_eliminada
+  );
 end;
 $fn$;
 

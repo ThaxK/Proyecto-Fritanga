@@ -21,6 +21,7 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
   const [cobrando, setCobrando] = useState(false)
   const [errorCobro, setErrorCobro] = useState<string | null>(null)
   const [recibidoCobro, setRecibidoCobro] = useState(0)
+  const [aviso, setAviso] = useState<string | null>(null)
 
   // Item de cuenta (para el desglose)
   interface CuentaItem {
@@ -192,12 +193,22 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
       const item = cuentaCobrando.items.find(i => i.producto_id === productoId)
       if (!item) return
 
-      const { error } = await supabase!.rpc('fn_restar_item_cuenta', {
+      const { data, error } = await supabase!.rpc('fn_restar_item_cuenta', {
         p_cuenta_id: cuentaCobrando.id,
         p_producto_id: productoId,
         p_cantidad: 1
       })
       if (error) throw error
+
+      // La cuenta quedó sin items: el RPC la eliminó en la BD
+      if (data?.cuenta_eliminada) {
+        const etiqueta = cuentaCobrando.etiqueta
+        cerrarModalCobro()
+        refrescar()
+        setAviso(`"${etiqueta}" quedó vacía y fue eliminada`)
+        setTimeout(() => setAviso(null), 4000)
+        return
+      }
 
       // Recalcular items locales
       const nuevosItems = cuentaCobrando.items
@@ -216,8 +227,9 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
       setRecibidoCobro(nuevoTotal)
     } catch (e) {
       setErrorCobro('Error: ' + (e as Error).message)
+    } finally {
+      setRestando(false)
     }
-    setRestando(false)
   }
 
   const handleCobrarFinal = async () => {
@@ -288,6 +300,13 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
       </header>
 
       <main className="flex-1 p-3 space-y-4 overflow-y-auto">
+        {/* Aviso temporal (cuenta eliminada) */}
+        {aviso && (
+          <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-3 py-2 text-sm font-medium">
+            ✓ {aviso}
+          </div>
+        )}
+
         {/* Crear nueva cuenta */}
         <section className="bg-white rounded-xl p-3 shadow-sm space-y-2">
           <button
