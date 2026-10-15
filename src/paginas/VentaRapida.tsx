@@ -21,6 +21,14 @@ interface ProductoConStock {
   stock: number
 }
 
+// Item ya registrado en una cuenta existente (solo lectura en esta vista)
+interface ItemCuentaExistente {
+  producto_id: number
+  nombre: string
+  cantidad: number
+  subtotal: number
+}
+
 interface VentaRapidaProps {
   cuentaId?: number
   cuentaEtiqueta?: string
@@ -41,6 +49,10 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
   const [operacionCuenta, setOperacionCuenta] = useState<
     { etiqueta: string; cuentaId: number | null; txItems: string } | null
   >(null)
+  // Items que la cuenta YA tiene en la BD (solo lectura; nunca se meten en
+  // el carrito porque "Agregar a la cuenta" reenviaría y los duplicaría)
+  const [itemsCuenta, setItemsCuenta] = useState<ItemCuentaExistente[]>([])
+  const [totalCuenta, setTotalCuenta] = useState(0)
 
   const total = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0)
   const vuelto = recibido - total
@@ -90,6 +102,62 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
 
   useEffect(() => { refrescarStock() }, [refrescarStock])
 
+  // ----- Cargar items que la cuenta ya tiene (solo lectura) -----
+  const cargarItemsCuenta = useCallback(async () => {
+    if (!cuentaId) {
+      setItemsCuenta([])
+      setTotalCuenta(0)
+      return
+    }
+    if (!supabaseConfigurado) return
+    try {
+      const { data, error } = await supabase!
+        .from('venta')
+        .select(`
+          total_cop,
+          detalle_venta (
+            producto_id,
+            cantidad,
+            precio_unit_cop,
+            subtotal_cop,
+            producto:producto_id (nombre)
+          )
+        `)
+        .eq('cuenta_id', cuentaId)
+        .eq('tipo', 'cuenta')
+      if (error) throw error
+
+      // Aplanar y agrupar por producto (mismo criterio que el modal de cobro)
+      const mapa = new Map<number, ItemCuentaExistente>()
+      ;(data ?? []).forEach(v => {
+        ;((v as any).detalle_venta ?? []).forEach((d: any) => {
+          const prev = mapa.get(d.producto_id)
+          if (prev) {
+            mapa.set(d.producto_id, {
+              ...prev,
+              cantidad: prev.cantidad + d.cantidad,
+              subtotal: prev.subtotal + d.subtotal_cop
+            })
+          } else {
+            mapa.set(d.producto_id, {
+              producto_id: d.producto_id,
+              nombre: d.producto?.nombre || 'Producto',
+              cantidad: d.cantidad,
+              subtotal: d.subtotal_cop
+            })
+          }
+        })
+      })
+      const items = Array.from(mapa.values())
+      setItemsCuenta(items)
+      setTotalCuenta(items.reduce((s, i) => s + i.subtotal, 0))
+    } catch (e) {
+      console.error('Error cargando items de la cuenta:', e)
+    }
+  }, [cuentaId])
+
+  useEffect(() => { cargarItemsCuenta() }, [cargarItemsCuenta])
+
   // ----- Suscripción Realtime a ventas para actualizar stock -----
   useEffect(() => {
     if (!supabaseConfigurado) return
@@ -99,17 +167,17 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'venta' },
-        () => refrescarStock()
+        () => { refrescarStock(); cargarItemsCuenta() }
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'detalle_venta' },
-        () => refrescarStock()
+        () => { refrescarStock(); cargarItemsCuenta() }
       )
       .subscribe()
 
     return () => { supabase!.removeChannel(canal) }
-  }, [])
+  }, [refrescarStock, cargarItemsCuenta])
 
   // ----- Handlers del carrito -----
   const agregarAlCarrito = (prod: ProductoConStock) => {
@@ -278,7 +346,7 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
         </div>
       </header>
 
-      <main className="flex-1 p-3 space-y-4 overflow-y-auto pb-[200px]">
+      <main className={`flex-1 p-3 space-y-4 overflow-y-auto ${esCuenta ? 'pb-[320px]' : 'pb-[200px]'}`}>
         {/* Grid de productos */}
         <section aria-label="Productos">
           <div className="grid grid-cols-2 gap-2">
@@ -326,6 +394,24 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
 
       {/* Contenedor fijo inferior: Carrito + Panel de pago */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-neutral-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+        {/* Items que la cuenta ya tiene (solo lectura) */}
+        {esCuenta && itemsCuenta.length > 0 && (
+          <section aria-label="Items ya en la cuenta" className="px-3 pt-2 space-y-1 border-b border-neutral-100">
+            <h2 className="font-semibold flex justify-between text-xs text-neutral-500">
+              <span>✓ Ya en {cuentaEtiqueta} ({itemsCuenta.reduce((s, i) => s + i.cantidad, 0)})</span>
+              <span>${totalCuenta.toLocaleString()}</span>
+            </h2>
+            <ul className="space-y-1 max-h-[80px] overflow-y-auto overscroll-contain">
+              {itemsCuenta.map(item => (
+                <li key={item.producto_id} className="flex items-center gap-1.5 text-sm bg-neutral-50 border border-neutral-100 rounded-lg p-1.5">
+                  <span className="flex-1 text-xs truncate text-neutral-500">{item.nombre} × {item.cantidad}</span>
+                  <span className="w-14 shrink-0 text-right text-xs font-medium text-neutral-500">${item.subtotal.toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* Carrito - máximo 35dvh, scrollea si hay más */}
         {carrito.length > 0 && (
           <section aria-label="Carrito actual" className="px-3 pt-2 space-y-1 border-b border-neutral-100">
