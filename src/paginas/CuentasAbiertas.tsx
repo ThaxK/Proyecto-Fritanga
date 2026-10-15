@@ -22,6 +22,11 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
   const [errorCobro, setErrorCobro] = useState<string | null>(null)
   const [recibidoCobro, setRecibidoCobro] = useState(0)
   const [aviso, setAviso] = useState<string | null>(null)
+  // Idempotencia: uuid estable por sesión de cobro; se renueva al abrir el
+  // modal y tras cada éxito, para que un reintento no duplique la venta
+  const [txCobro, setTxCobro] = useState(() => crypto.randomUUID())
+  // Etiqueta de la cuenta en creación: estable entre reintentos
+  const [etiquetaPendiente, setEtiquetaPendiente] = useState<string | null>(null)
 
   // Item de cuenta (para el desglose)
   interface CuentaItem {
@@ -90,12 +95,17 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
 
     try {
       // Generar nombre secuencial: "Cuenta 1", "Cuenta 2", ...
-      const numero = cuentas.length + 1
+      // La etiqueta se conserva entre reintentos para que fn_crear_cuenta
+      // deduplique por etiqueta si el intento anterior sí llegó al servidor
+      const etiqueta = etiquetaPendiente ?? `Cuenta ${cuentas.length + 1}`
+      if (!etiquetaPendiente) setEtiquetaPendiente(etiqueta)
+
       const { error } = await supabase!.rpc('fn_crear_cuenta', {
-        p_etiqueta: `Cuenta ${numero}`,
+        p_etiqueta: etiqueta,
         p_operador: localStorage.getItem('operador') || ''
       })
       if (error) throw error
+      setEtiquetaPendiente(null)
       refrescar()
     } catch (e) {
       setError('Error: ' + (e as Error).message)
@@ -113,6 +123,8 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
     if (!supabaseConfigurado) return
     setErrorCobro(null)
     setRecibidoCobro(total)
+    // Nueva sesión de cobro → nueva clave de idempotencia
+    setTxCobro(crypto.randomUUID())
 
     // Obtener items de la cuenta
     const { data: ventas, error } = await supabase!
@@ -248,13 +260,16 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
     const { error } = await supabase!.rpc('fn_cobrar_cuenta', {
       p_cuenta_id: cuentaCobrando.id,
       p_recibido_cop: recibidoCobro,
-      p_client_tx_id: crypto.randomUUID(),
+      p_client_tx_id: txCobro,
       p_operador: localStorage.getItem('operador') || ''
     })
 
     if (error) {
+      // Mantener txCobro: si el intento anterior sí llegó al servidor,
+      // el reintento con el mismo uuid devuelve la venta ya registrada
       setErrorCobro('Error: ' + error.message)
     } else {
+      setTxCobro(crypto.randomUUID())
       cerrarModalCobro()
       refrescar()
     }

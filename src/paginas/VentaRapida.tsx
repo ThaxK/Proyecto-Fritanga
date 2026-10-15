@@ -33,6 +33,14 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  // Idempotencia: uuid estable por operación de venta; se renueva SOLO tras éxito
+  // para que un reintento tras corte de internet no duplique la venta
+  const [txVenta, setTxVenta] = useState(() => crypto.randomUUID())
+  // Operación "crear cuenta con carrito": se conserva entre reintentos
+  // (etiqueta e id evitan crear cuentas huérfanas si falla el paso 2)
+  const [operacionCuenta, setOperacionCuenta] = useState<
+    { etiqueta: string; cuentaId: number | null; txItems: string } | null
+  >(null)
 
   const total = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0)
   const vuelto = recibido - total
@@ -151,7 +159,7 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
       const { error } = await supabase!.rpc('fn_registrar_venta', {
         p_items: items,
         p_recibido_cop: recibidoFinal,
-        p_client_tx_id: crypto.randomUUID(),
+        p_client_tx_id: txVenta,
         p_cuenta_id: cuentaId,
         p_operador: localStorage.getItem('operador') || ''
       })
@@ -159,6 +167,7 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
       else {
         setCarrito([])
         setRecibido(0)
+        setTxVenta(crypto.randomUUID())
         window.location.hash = ''
       }
       setEnviando(false)
@@ -169,7 +178,7 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
     const { error } = await supabase!.rpc('fn_registrar_venta', {
       p_items: items,
       p_recibido_cop: recibidoFinal,
-      p_client_tx_id: crypto.randomUUID(),
+      p_client_tx_id: txVenta,
       p_cuenta_id: null,
       p_operador: localStorage.getItem('operador') || ''
     })
@@ -177,6 +186,7 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
     else {
       setCarrito([])
       setRecibido(0)
+      setTxVenta(crypto.randomUUID())
     }
     setEnviando(false)
   }
@@ -188,32 +198,49 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
     setError(null)
 
     try {
-      // 1. Contar cuentas abiertas para generar nombre secuencial
-      const { count } = await supabase!
-        .from('cuenta')
-        .select('id', { count: 'exact', head: true })
-        .eq('estado', 'abierta')
-      const numero = (count ?? 0) + 1
+      // 1. Operación idempotente: etiqueta, id y tx se calculan UNA vez
+      //    y se reutilizan en cada reintento (fn_crear_cuenta deduplica por etiqueta)
+      let op = operacionCuenta
+      if (!op) {
+        const { count, error: errorCount } = await supabase!
+          .from('cuenta')
+          .select('id', { count: 'exact', head: true })
+          .eq('estado', 'abierta')
+        if (errorCount) throw errorCount
+        op = {
+          etiqueta: `Cuenta ${(count ?? 0) + 1}`,
+          cuentaId: null,
+          txItems: crypto.randomUUID()
+        }
+        setOperacionCuenta(op)
+      }
 
-      // 2. Crear la cuenta
-      const { data: cuentaIdNueva, error: errorCuenta } = await supabase!.rpc('fn_crear_cuenta', {
-        p_etiqueta: `Cuenta ${numero}`,
-        p_operador: localStorage.getItem('operador') || ''
-      })
-      if (errorCuenta) throw errorCuenta
+      // 2. Crear la cuenta (se saltea si el paso anterior ya dio el id)
+      let cuentaId = op.cuentaId
+      if (!cuentaId) {
+        const { data: cuentaIdNueva, error: errorCuenta } = await supabase!.rpc('fn_crear_cuenta', {
+          p_etiqueta: op.etiqueta,
+          p_operador: localStorage.getItem('operador') || ''
+        })
+        if (errorCuenta) throw errorCuenta
+        cuentaId = cuentaIdNueva
+        op = { ...op, cuentaId }
+        setOperacionCuenta(op)
+      }
 
       // 3. Registrar los items del carrito como venta tipo 'cuenta'
       const items = carrito.map(i => ({ producto_id: i.productoId, cantidad: i.cantidad }))
       const { error: errorVenta } = await supabase!.rpc('fn_registrar_venta', {
         p_items: items,
         p_recibido_cop: 0,
-        p_client_tx_id: crypto.randomUUID(),
-        p_cuenta_id: cuentaIdNueva,
+        p_client_tx_id: op.txItems,
+        p_cuenta_id: cuentaId,
         p_operador: localStorage.getItem('operador') || ''
       })
       if (errorVenta) throw errorVenta
 
-      // 4. Volver a la venta normal (sin hash ni cuenta seleccionada)
+      // 4. Operación completa: la próxima empieza con valores nuevos
+      setOperacionCuenta(null)
       setCarrito([])
       setRecibido(0)
       window.location.hash = ''
