@@ -33,7 +33,9 @@ create table if not exists ajustes (
 create table if not exists producto (
   id bigint generated always as identity primary key,
   nombre text not null,
-  precio_cop integer not null check (precio_cop >= 0),
+  -- Regla del negocio: no existe producto de $0. Con el precio en > 0 una
+  -- cuenta no puede quedar con total $0 y trabarse entre cobrar y eliminar.
+  precio_cop integer not null check (precio_cop > 0),
   orden integer not null default 0,
   activo boolean not null default true,
   imagen_url text not null default ''

@@ -14,6 +14,7 @@ const ARCHIVOS_ESQUEMA = [
   'migracion_imagenes.sql',
   'migracion_cuenta_vacia.sql',
   'migracion_cuentas.sql',
+  'migracion_precio_positivo.sql',
 ]
 
 export interface BaseDeDatosDePrueba {
