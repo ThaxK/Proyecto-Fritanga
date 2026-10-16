@@ -47,7 +47,7 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
   // Operación "crear cuenta con carrito": se conserva entre reintentos
   // (etiqueta e id evitan crear cuentas huérfanas si falla el paso 2)
   const [operacionCuenta, setOperacionCuenta] = useState<
-    { etiqueta: string; cuentaId: number | null; txItems: string } | null
+    { txCuenta: string; cuentaId: number | null; txItems: string } | null
   >(null)
   // Items que la cuenta YA tiene en la BD (solo lectura; nunca se meten en
   // el carrito porque "Agregar a la cuenta" reenviaría y los duplicaría)
@@ -266,17 +266,12 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
     setError(null)
 
     try {
-      // 1. Operación idempotente: etiqueta, id y tx se calculan UNA vez
-      //    y se reutilizan en cada reintento (fn_crear_cuenta deduplica por etiqueta)
+      // 1. Operación idempotente: los uuid se calculan UNA vez y se reutilizan
+      //    en cada reintento. El número de la cuenta lo asigna la base.
       let op = operacionCuenta
       if (!op) {
-        const { count, error: errorCount } = await supabase!
-          .from('cuenta')
-          .select('id', { count: 'exact', head: true })
-          .eq('estado', 'abierta')
-        if (errorCount) throw errorCount
         op = {
-          etiqueta: `Cuenta ${(count ?? 0) + 1}`,
+          txCuenta: crypto.randomUUID(),
           cuentaId: null,
           txItems: crypto.randomUUID()
         }
@@ -286,8 +281,8 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
       // 2. Crear la cuenta (se saltea si el paso anterior ya dio el id)
       let cuentaId = op.cuentaId
       if (!cuentaId) {
-        const { data: cuentaIdNueva, error: errorCuenta } = await supabase!.rpc('fn_crear_cuenta', {
-          p_etiqueta: op.etiqueta,
+        const { data: cuentaIdNueva, error: errorCuenta } = await supabase!.rpc('fn_crear_cuenta_automatica', {
+          p_client_tx_id: op.txCuenta,
           p_operador: localStorage.getItem('operador') || ''
         })
         if (errorCuenta) throw errorCuenta

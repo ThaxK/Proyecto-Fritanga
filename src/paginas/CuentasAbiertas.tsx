@@ -25,8 +25,10 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
   // Idempotencia: uuid estable por sesión de cobro; se renueva al abrir el
   // modal y tras cada éxito, para que un reintento no duplique la venta
   const [txCobro, setTxCobro] = useState(() => crypto.randomUUID())
-  // Etiqueta de la cuenta en creación: estable entre reintentos
-  const [etiquetaPendiente, setEtiquetaPendiente] = useState<string | null>(null)
+  // Idempotencia de la creación: uuid estable entre reintentos; se renueva
+  // tras cada éxito, para que un reintento no abra una segunda cuenta (el
+  // número de la cuenta lo asigna la base, no esta pantalla)
+  const [txCuenta, setTxCuenta] = useState(() => crypto.randomUUID())
 
   // Item de cuenta (para el desglose)
   interface CuentaItem {
@@ -94,18 +96,15 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
     setError(null)
 
     try {
-      // Generar nombre secuencial: "Cuenta 1", "Cuenta 2", ...
-      // La etiqueta se conserva entre reintentos para que fn_crear_cuenta
-      // deduplique por etiqueta si el intento anterior sí llegó al servidor
-      const etiqueta = etiquetaPendiente ?? `Cuenta ${cuentas.length + 1}`
-      if (!etiquetaPendiente) setEtiquetaPendiente(etiqueta)
-
-      const { error } = await supabase!.rpc('fn_crear_cuenta', {
-        p_etiqueta: etiqueta,
+      // El número ("Cuenta N") lo asigna la base dentro del bloqueo del turno.
+      // No se deriva acá de un conteo: al eliminar una cuenta vacía el conteo
+      // baja y el nombre volvería a chocar con otra cuenta abierta.
+      const { error } = await supabase!.rpc('fn_crear_cuenta_automatica', {
+        p_client_tx_id: txCuenta,
         p_operador: localStorage.getItem('operador') || ''
       })
       if (error) throw error
-      setEtiquetaPendiente(null)
+      setTxCuenta(crypto.randomUUID())
       refrescar()
     } catch (e) {
       setError('Error: ' + (e as Error).message)
@@ -329,7 +328,7 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
             disabled={creando}
             className="w-full rounded-xl bg-orange-500 px-4 py-3 text-base font-semibold text-white active:bg-orange-600 disabled:opacity-40"
           >
-            {creando ? 'Creando…' : `+ Nueva cuenta (Cuenta ${cuentas.length + 1})`}
+            {creando ? 'Creando…' : '+ Nueva cuenta'}
           </button>
           {error && <p className="text-red-600 text-sm">{error}</p>}
         </section>
