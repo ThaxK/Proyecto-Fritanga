@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, supabaseConfigurado } from '../servicios/supabase'
+import {
+  desplazarFecha,
+  fechaHoyZona,
+  formatearFechaLarga,
+  horaEnZona,
+  rangoDiaZona,
+} from '../servicios/fechas'
 
 interface ResumenDia {
   fecha: string
@@ -25,7 +32,7 @@ interface VentaPorHora {
 }
 
 export default function Reportes() {
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(() => new Date().toISOString().split('T')[0])
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(() => fechaHoyZona())
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resumen, setResumen] = useState<ResumenDia | null>(null)
@@ -38,15 +45,15 @@ export default function Reportes() {
     setError(null)
     try {
       const fecha = fechaSeleccionada
-      const fechaInicio = `${fecha} 00:00:00`
-      const fechaFin = `${fecha} 23:59:59`
+      // Fronteras del día del negocio, ya convertidas a instantes UTC.
+      const { desde, hasta } = rangoDiaZona(fecha)
 
       // 1. Ventas del día
       const { data: ventasDia, error: errVentas } = await supabase!
         .from('venta')
         .select('id, total_cop, tipo, cuenta_id, creada_el')
-        .gte('creada_el', fechaInicio)
-        .lte('creada_el', fechaFin)
+        .gte('creada_el', desde)
+        .lt('creada_el', hasta)
         .in('tipo', ['mostrador', 'cobro_cuenta'])
       if (errVentas) throw errVentas
       const ventasDiaData = ventasDia ?? []
@@ -86,7 +93,7 @@ export default function Reportes() {
       // 4. Ventas por hora - usando objeto simple en lugar de Map
       const ventasHoraMap: Record<number, VentaPorHora> = {}
       ventasDiaData.forEach(v => {
-        const hora = new Date(v.creada_el).getHours()
+        const hora = horaEnZona(v.creada_el)
         if (!ventasHoraMap[hora]) {
           ventasHoraMap[hora] = { hora, num_ventas: 0, total_cop: 0 }
         }
@@ -107,8 +114,7 @@ export default function Reportes() {
 
   useEffect(() => { cargarReportes() }, [cargarReportes])
 
-  const formatearFecha = (fecha: string) =>
-    new Date(fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const hoy = fechaHoyZona()
 
   if (cargando) {
     return (
@@ -129,13 +135,13 @@ export default function Reportes() {
         {error && <div className="bg-red-50 p-3 rounded-xl text-red-700 text-sm" role="alert">{error}</div>}
 
         <div className="flex gap-2 p-3 bg-white rounded-xl shadow-sm">
-          <button onClick={() => setFechaSeleccionada(new Date().toISOString().split('T')[0])} className={`flex-1 rounded-xl py-2 text-sm font-semibold ${fechaSeleccionada === new Date().toISOString().split('T')[0] ? 'bg-orange-500 text-white' : 'bg-neutral-100 text-neutral-700'}`}>Hoy</button>
-          <button onClick={() => { const ayer = new Date(); ayer.setDate(ayer.getDate() - 1); setFechaSeleccionada(ayer.toISOString().split('T')[0]) }} className="flex-1 rounded-xl py-2 text-sm font-semibold bg-neutral-100 text-neutral-700 active:bg-neutral-200">Ayer</button>
+          <button onClick={() => setFechaSeleccionada(hoy)} className={`flex-1 rounded-xl py-2 text-sm font-semibold ${fechaSeleccionada === hoy ? 'bg-orange-500 text-white' : 'bg-neutral-100 text-neutral-700'}`}>Hoy</button>
+          <button onClick={() => setFechaSeleccionada(desplazarFecha(hoy, -1))} className="flex-1 rounded-xl py-2 text-sm font-semibold bg-neutral-100 text-neutral-700 active:bg-neutral-200">Ayer</button>
         </div>
 
         {resumen && (
           <section className="bg-white rounded-xl p-3 shadow-sm space-y-3">
-            <h2 className="font-semibold">📈 Resumen del día ({formatearFecha(fechaSeleccionada)})</h2>
+            <h2 className="font-semibold">📈 Resumen del día ({formatearFechaLarga(fechaSeleccionada)})</h2>
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-orange-50 rounded-xl p-3 text-center"><div className="text-xs text-orange-700">Ventas totales</div><div className="text-2xl font-bold text-orange-600">${resumen.total_ventas.toLocaleString()}</div></div>
               <div className="bg-green-50 rounded-xl p-3 text-center"><div className="text-xs text-green-700">Efectivo (mostrador)</div><div className="text-2xl font-bold text-green-700">${resumen.total_efectivo.toLocaleString()}</div></div>
