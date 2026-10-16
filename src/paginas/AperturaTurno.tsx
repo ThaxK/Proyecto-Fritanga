@@ -12,7 +12,9 @@ interface ProductoConteo {
 export default function AperturaTurno({ onTurnoAbierto }: { onTurnoAbierto: () => void }) {
   const [productos, setProductos] = useState<ProductoConteo[]>([])
   const [baseInicial, setBaseInicial] = useState<number>(70000)
-  const [cargando, setCargando] = useState(true)
+  // Sin conexión no hay nada que traer: si arrancara en "cargando", la ruedita
+  // giraría para siempre (el early return de abajo nunca apaga el flag).
+  const [cargando, setCargando] = useState(supabaseConfigurado)
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
@@ -84,6 +86,14 @@ export default function AperturaTurno({ onTurnoAbierto }: { onTurnoAbierto: () =
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h2 className="text-2xl font-bold mb-2 text-center">📅 Apertura de turno</h2>
+
+      {/* Esta es la pantalla de entrada: si falta la configuración hay que
+          decirlo acá, porque todavía no se ve la barra de App. */}
+      {!supabaseConfigurado && (
+        <p className="mb-4 p-3 rounded-lg bg-yellow-100 text-sm text-yellow-800 text-center">
+          {avisoSinConexion}
+        </p>
+      )}
 
       <div className="mb-4 p-3 rounded-xl bg-orange-50 border border-orange-200 text-center">
         <div className="text-sm text-orange-700">Fecha del turno</div>

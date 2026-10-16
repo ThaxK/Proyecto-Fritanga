@@ -38,7 +38,9 @@ export default function VentaRapida({ cuentaId, cuentaEtiqueta }: VentaRapidaPro
   const [productos, setProductos] = useState<ProductoConStock[]>([])
   const [carrito, setCarrito] = useState<CarritoItem[]>([])
   const [recibido, setRecibido] = useState(0)
-  const [cargando, setCargando] = useState(true)
+  // Sin conexión no hay nada que traer: si arrancara en "cargando", la ruedita
+  // giraría para siempre (el early return de abajo nunca apaga el flag).
+  const [cargando, setCargando] = useState(supabaseConfigurado)
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   // Idempotencia: uuid estable por operación de venta; se renueva SOLO tras éxito

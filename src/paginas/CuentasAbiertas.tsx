@@ -12,7 +12,9 @@ interface CuentaConTotal {
 
 export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) {
   const [cuentas, setCuentas] = useState<CuentaConTotal[]>([])
-  const [cargando, setCargando] = useState(true)
+  // Sin conexión no hay nada que traer: si arrancara en "cargando", la ruedita
+  // giraría para siempre (el early return de abajo nunca apaga el flag).
+  const [cargando, setCargando] = useState(supabaseConfigurado)
   const [error, setError] = useState<string | null>(null)
   const [creando, setCreando] = useState(false)
   
