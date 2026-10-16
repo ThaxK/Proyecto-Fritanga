@@ -182,14 +182,28 @@ describe('cuentas abiertas', () => {
     expect(await etiquetasAbiertas()).toEqual(['Cuenta 2', 'Cuenta 3'])
   })
 
-  // Bug aparte, detectado al escribir esto: fn_restar_item_cuenta sólo elimina
-  // la cuenta cuando le queda algún ítem que restar, así que una cuenta creada
-  // por error y nunca usada queda abierta para siempre y fn_cerrar_turno la
-  // rechaza con CUENTAS_ABIERTAS. No hay ninguna acción en la UI que la saque.
-  // it.fails marca que hoy no se cumple y avisa cuando se arregle.
-  it.fails('una cuenta creada y nunca usada no deja el turno imposible de cerrar', async () => {
-    await crearAutomatica()
+  // Este era el bug que hacía imposible cerrar el turno: una cuenta creada por
+  // error y nunca usada no se podía sacar (fn_restar_item_cuenta sólo elimina
+  // una cuenta cuando le queda algún ítem que restar) y fn_cerrar_turno la
+  // rechaza con CUENTAS_ABIERTAS.
+  it('una cuenta creada y nunca usada se puede eliminar y ya no traba el cierre', async () => {
+    const huerfana = await crearAutomatica()
 
+    await expect(cerrarTurno()).rejects.toThrow(/CUENTAS_ABIERTAS/)
+
+    await sql('select fn_eliminar_cuenta_vacia($1)', [huerfana])
+
+    expect(await etiquetasAbiertas()).toEqual([])
     await expect(cerrarTurno()).resolves.toBeDefined()
+  })
+
+  it('no deja eliminar una cuenta que tiene ítems', async () => {
+    const cuenta = await crearAutomatica()
+    await agregarItem(cuenta)
+
+    await expect(sql('select fn_eliminar_cuenta_vacia($1)', [cuenta])).rejects.toThrow(
+      /CUENTA_CON_ITEMS/,
+    )
+    expect(await etiquetasAbiertas()).toEqual(['Cuenta 1'])
   })
 })

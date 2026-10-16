@@ -22,6 +22,8 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
   const [errorCobro, setErrorCobro] = useState<string | null>(null)
   const [recibidoCobro, setRecibidoCobro] = useState(0)
   const [aviso, setAviso] = useState<string | null>(null)
+  // Cuenta que se está eliminando (para deshabilitar su botón)
+  const [eliminando, setEliminando] = useState<number | null>(null)
   // Idempotencia: uuid estable por sesión de cobro; se renueva al abrir el
   // modal y tras cada éxito, para que un reintento no duplique la venta
   const [txCobro, setTxCobro] = useState(() => crypto.randomUUID())
@@ -110,6 +112,26 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
       setError('Error: ' + (e as Error).message)
     }
     setCreando(false)
+  }
+
+  // Descartar una cuenta creada por error y que no llegó a usarse. Sin esto se
+  // queda abierta para siempre y fn_cerrar_turno no deja cerrar el turno.
+  const handleEliminarCuenta = async (cuentaId: number, etiqueta: string) => {
+    setEliminando(cuentaId)
+    setError(null)
+
+    try {
+      const { error } = await supabase!.rpc('fn_eliminar_cuenta_vacia', {
+        p_cuenta_id: cuentaId
+      })
+      if (error) throw error
+      refrescar()
+      setAviso(`"${etiqueta}" se eliminó`)
+      setTimeout(() => setAviso(null), 4000)
+    } catch (e) {
+      setError('Error: ' + (e as Error).message)
+    }
+    setEliminando(null)
   }
 
   // Navegar a VentaRapida con cuenta preseleccionada
@@ -365,17 +387,27 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
                       >
                         Agregar items
                       </button>
-                      <button
-                        onClick={() => handleAbrirCobro(c.id, etiqueta, total)}
-                        disabled={total <= 0}
-                        className={`rounded-xl py-3 font-semibold ${
-                          total > 0
-                            ? 'bg-green-50 border border-green-200 text-green-700 active:bg-green-100'
-                            : 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
-                        }`}
-                      >
-                        Cobrar (${total.toLocaleString()})
-                      </button>
+                      {items > 0 ? (
+                        <button
+                          onClick={() => handleAbrirCobro(c.id, etiqueta, total)}
+                          disabled={total <= 0}
+                          className={`rounded-xl py-3 font-semibold ${
+                            total > 0
+                              ? 'bg-green-50 border border-green-200 text-green-700 active:bg-green-100'
+                              : 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+                          }`}
+                        >
+                          Cobrar (${total.toLocaleString()})
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleEliminarCuenta(c.id, etiqueta)}
+                          disabled={eliminando === c.id}
+                          className="rounded-xl py-3 font-semibold bg-neutral-100 border border-neutral-200 text-neutral-600 active:bg-neutral-200 disabled:opacity-40"
+                        >
+                          {eliminando === c.id ? 'Eliminando…' : '✕ Eliminar'}
+                        </button>
+                      )}
                     </div>
                   </li>
                 )

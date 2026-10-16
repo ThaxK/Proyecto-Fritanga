@@ -13,7 +13,7 @@ const ARCHIVOS_ESQUEMA = [
   'schema.sql',
   'migracion_imagenes.sql',
   'migracion_cuenta_vacia.sql',
-  'migracion_cuenta_numero.sql',
+  'migracion_cuentas.sql',
 ]
 
 export interface BaseDeDatosDePrueba {

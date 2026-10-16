@@ -445,7 +445,7 @@ begin
 end;
 $fn$;
 
--- 5.3 Crear cuenta con nombre automático "Cuenta N" (RF3).
+-- 5.2b Crear cuenta con nombre automático "Cuenta N" (RF3).
 --     El número sale de una secuencia real del turno, no de un conteo del
 --     cliente. Un conteo no sobrevive al borrado de una cuenta vacía: por eso
 --     "Cuenta N" terminaba apuntando a la cuenta de otro cliente.
@@ -511,6 +511,43 @@ begin
   end;
 
   return v_cuenta_id;
+end;
+$fn$;
+
+-- 5.2c Eliminar una cuenta abierta que todavía no tiene ventas.
+--      fn_restar_item_cuenta sólo elimina una cuenta cuando le queda algún ítem
+--      que restar, así que una cuenta creada por error y nunca usada quedaba
+--      abierta para siempre: fn_cerrar_turno la rechaza con CUENTAS_ABIERTAS y
+--      el turno quedaba imposible de cerrar.
+create or replace function fn_eliminar_cuenta_vacia(p_cuenta_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_turno_id bigint;
+begin
+  -- bloqueo de concurrencia (mismo punto único de serialización)
+  select id into v_turno_id
+  from turno where estado = 'abierto'
+  order by id limit 1 for update;
+  if v_turno_id is null then
+    raise exception 'TURNO_CERRADO: no hay turno abierto';
+  end if;
+
+  perform 1 from cuenta
+  where id = p_cuenta_id and turno_id = v_turno_id and estado = 'abierta';
+  if not found then
+    raise exception 'CUENTA_CERRADA: la cuenta no está abierta';
+  end if;
+
+  -- mismo criterio de "vacía" que fn_restar_item_cuenta
+  if exists (select 1 from venta where cuenta_id = p_cuenta_id) then
+    raise exception 'CUENTA_CON_ITEMS: vacía la cuenta antes de eliminarla';
+  end if;
+
+  delete from cuenta where id = p_cuenta_id;
 end;
 $fn$;
 
