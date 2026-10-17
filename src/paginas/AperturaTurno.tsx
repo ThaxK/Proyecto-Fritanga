@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase, supabaseConfigurado, avisoSinConexion } from '../servicios/supabase'
+import FormularioProducto from '../componentes/FormularioProducto'
 
 // Item de conteo: nombre, precio, cantidad inicial (editable)
 interface ProductoConteo {
@@ -18,29 +19,31 @@ export default function AperturaTurno({ onTurnoAbierto }: { onTurnoAbierto: () =
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
-  // Cargar catálogo al montar
-  useEffect(() => {
-    async function cargarCatalogo() {
-      if (!supabaseConfigurado) return
-      const { data, error } = await supabase!
-        .from('producto')
-        .select('id, nombre, precio_cop, orden')
-        .eq('activo', true)
-        .order('orden')
-      if (error) setError('Error cargando catálogo: ' + error.message)
-      else if (data) {
-        const inicial = data.map(p => ({
-          id: p.id,
-          nombre: p.nombre,
-          precio_cop: p.precio_cop,
-          cantidad: 0
-        }))
-        setProductos(inicial)
-      }
-      setCargando(false)
+  // Cargar catálogo al montar. Se expone como useCallback para poder
+  // re-invocarlo cuando se crea un producto nuevo sin volver a montar.
+  const cargarCatalogo = useCallback(async () => {
+    if (!supabaseConfigurado) return
+    const { data, error } = await supabase!
+      .from('producto')
+      .select('id, nombre, precio_cop, orden')
+      .eq('activo', true)
+      .order('orden')
+    if (error) setError('Error cargando catálogo: ' + error.message)
+    else if (data) {
+      const inicial = data.map(p => ({
+        id: p.id,
+        nombre: p.nombre,
+        precio_cop: p.precio_cop,
+        cantidad: 0
+      }))
+      setProductos(inicial)
     }
-    cargarCatalogo()
+    setCargando(false)
   }, [])
+
+  useEffect(() => {
+    cargarCatalogo()
+  }, [cargarCatalogo])
 
   const handleCantidadChange = (id: number, value: string) => {
     const n = value === '' ? 0 : parseInt(value, 10)
@@ -86,6 +89,8 @@ export default function AperturaTurno({ onTurnoAbierto }: { onTurnoAbierto: () =
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h2 className="text-2xl font-bold mb-2 text-center">📅 Apertura de turno</h2>
+
+      <FormularioProducto onCreado={cargarCatalogo} />
 
       {/* Esta es la pantalla de entrada: si falta la configuración hay que
           decirlo acá, porque todavía no se ve la barra de App. */}
