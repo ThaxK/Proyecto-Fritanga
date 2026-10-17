@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, supabaseConfigurado } from '../servicios/supabase'
+import FormularioProducto from '../componentes/FormularioProducto'
 
 interface StockItem {
   producto_id: number
@@ -95,6 +96,8 @@ export default function Inventario() {
           En vivo
         </span>
       </header>
+
+      <FormularioProducto onCreado={refrescar} />
 
       <main className="flex-1 p-3 space-y-4 overflow-y-auto">
         {error && (
