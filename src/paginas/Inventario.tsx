@@ -97,9 +97,9 @@ export default function Inventario() {
         </span>
       </header>
 
-      <FormularioProducto onCreado={refrescar} />
-
       <main className="flex-1 p-3 space-y-4 overflow-y-auto">
+        <FormularioProducto onCreado={refrescar} />
+
         {error && (
           <div className="bg-red-50 p-3 rounded-xl text-red-700 text-sm" role="alert">{error}</div>
         )}
