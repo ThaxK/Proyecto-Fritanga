@@ -96,11 +96,6 @@ Cada archivo es idempotente y trae su propio autochequeo (`raise notice` al fina
 - **Stock cero al crear producto:** un producto nuevo aparece con stock 0 (AGOTADO) hasta que se le cargue un conteo con `fn_agregar_stock`. Dar de alta un producto no requiere turno abierto; darle stock sí.
 - **Operador:** por decisión del negocio, no se rastrea quién opera el mostrador. `Bienvenida.tsx` existe pero no se renderiza en `App.tsx`. Los campos `etiqueta_operador`, `creada_por` y `creado_por` quedan vacíos.
 
-## Próximos pasos
-
-- Aplicar `bd/migracion_precio_positivo.sql` y `bd/migracion_productos.sql` en el SQL Editor de Supabase.
-- (Opcional) Editar/desactivar productos (incremento aparte: hoy solo se pueden crear).
-- (Opcional) UI para `fn_movimiento_caja` (hoy no hay pantalla que registre retiros/entradas de caja).
 
 ## Licencia
 
