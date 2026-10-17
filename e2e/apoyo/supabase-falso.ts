@@ -6,6 +6,7 @@ export interface ProductoFalso {
   precio_cop: number
   orden: number
   activo: boolean
+  imagen_url?: string
 }
 
 export interface CuentaFalsa {
@@ -72,9 +73,21 @@ function filasDeLaTabla(
       }))
     }
 
-    // El stock no hace falta en estas pruebas: la pantalla de Venta queda vacía.
-    case 'v_stock_teorico':
-      return []
+    // El stock se deriva de conteo_inicial, que empieza en cero para cada
+    // producto activo del turno abierto.
+    case 'v_stock_teorico': {
+      return (estado.productos ?? []).map((p) => ({
+        producto_id: p.id,
+        nombre: p.nombre,
+        orden: p.orden,
+        precio_cop: p.precio_cop,
+        inicial: 0,
+        vendidos: 0,
+        teorico: 0,
+        turno_id: 1,
+        imagen_url: p.imagen_url,
+      }))
+    }
 
     default:
       return undefined
@@ -121,7 +134,23 @@ export async function fingirSupabase(page: Page, estado: EstadoDeSupabaseFalso =
         })
         return
       }
-      const datos = typeof respuesta === 'function' ? respuesta(cuerpo) : respuesta
+
+      let datos
+      try {
+        datos = typeof respuesta === 'function' ? respuesta(cuerpo) : respuesta
+      } catch (e) {
+        // La base lanza excepciones (ej. NOMBRE_VACIO, PRODUCTO_YA_EXISTE).
+        // Supabase las devuelve como HTTP 400 con el mensaje; simulamos eso
+        // para que la app muestre el error en pantalla.
+        const mensaje = e instanceof Error ? e.message : String(e)
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: mensaje }),
+        })
+        return
+      }
+
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

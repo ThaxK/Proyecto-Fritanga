@@ -97,7 +97,6 @@ export default function FormularioProducto({ onCreado }: FormularioProductoProps
                 <label className="block text-xs font-medium mb-1 text-neutral-600">Precio</label>
                 <input
                   type="number"
-                  min="1"
                   step="1"
                   value={precio}
                   onChange={e => setPrecio(e.target.value)}
