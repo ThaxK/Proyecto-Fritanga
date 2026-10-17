@@ -986,6 +986,44 @@ begin
 end;
 $fn$;
 
+-- 5.9 Crear producto (catálogo). A diferencia de 5.8, NO exige turno abierto:
+--     dar de alta el producto es independiente del turno, darle stock no.
+create or replace function fn_crear_producto(
+  p_nombre text,
+  p_precio_cop integer,
+  p_imagen_url text default ''
+) returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_id bigint;
+  v_orden integer;
+begin
+  if p_nombre is null or btrim(p_nombre) = '' then
+    raise exception 'NOMBRE_VACIO: escribe el nombre del producto';
+  end if;
+  if p_precio_cop is null or p_precio_cop <= 0 then
+    raise exception 'PRECIO_INVALIDO: el precio debe ser mayor que cero';
+  end if;
+
+  -- el producto nuevo va al final del orden del catálogo
+  select coalesce(max(orden), 0) + 1 into v_orden from producto;
+
+  insert into producto (nombre, precio_cop, orden, imagen_url)
+  values (btrim(p_nombre), p_precio_cop, v_orden, coalesce(btrim(p_imagen_url), ''))
+  returning id into v_id;
+
+  return v_id;
+exception
+  when unique_violation then
+    -- El único índice unique de producto es ux_producto_nombre_activo,
+    -- así que por acá sólo puede venir un nombre repetido.
+    raise exception 'PRODUCTO_YA_EXISTE: ya hay un producto activo con ese nombre';
+end;
+$fn$;
+
 -- 5.6 Cierre de turno (RF2 + RF5): conteo físico, mermas y cuadre
 --     p_conteos_fisicos: [{"producto_id": 1, "cantidad": 12}, ...]
 create or replace function fn_cerrar_turno(
