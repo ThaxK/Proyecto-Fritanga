@@ -98,7 +98,7 @@ export default function FormularioProducto({ onCreado }: FormularioProductoProps
                 <input
                   type="number"
                   min="1"
-                  step="100"
+                  step="1"
                   value={precio}
                   onChange={e => setPrecio(e.target.value)}
                   placeholder="0"
