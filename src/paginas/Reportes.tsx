@@ -48,7 +48,7 @@ export default function Reportes() {
       // Fronteras del día del negocio, ya convertidas a instantes UTC.
       const { desde, hasta } = rangoDiaZona(fecha)
 
-      // 1. Ventas del día
+      // 1. Ventas del día (mostrador y cobros de cuenta)
       const { data: ventasDia, error: errVentas } = await supabase!
         .from('venta')
         .select('id, total_cop, tipo, cuenta_id, creada_el')
@@ -58,12 +58,20 @@ export default function Reportes() {
       if (errVentas) throw errVentas
       const ventasDiaData = ventasDia ?? []
       const totalVentas = ventasDiaData.reduce((s, v) => s + v.total_cop, 0)
-      const totalEfectivo = ventasDiaData.filter(v => v.tipo === 'mostrador').reduce((s, v) => s + v.total_cop, 0)
+      // Tanto mostrador como cobro_cuenta entran por efectivo en caja
+      const totalEfectivo = ventasDiaData.reduce((s, v) => s + v.total_cop, 0)
       const numVentas = ventasDiaData.length
       const numCuentas = new Set(ventasDiaData.filter(v => v.cuenta_id).map(v => v.cuenta_id)).size
 
-      // 2. Items vendidos
-      const ventaIds = ventasDiaData.map(v => v.id)
+      // 2. Items vendidos: incluir también ventas tipo 'cuenta' del día,
+      // porque los ítems de una cuenta se registran al crear la venta, no al cobrar.
+      const { data: todasVentasDia, error: errTodasVentas } = await supabase!
+        .from('venta')
+        .select('id')
+        .gte('creada_el', desde)
+        .lt('creada_el', hasta)
+      if (errTodasVentas) throw errTodasVentas
+      const ventaIds = (todasVentasDia ?? []).map(v => v.id)
       let totalProductos = 0
       if (ventaIds.length > 0) {
         const { data: items } = await supabase!.from('detalle_venta').select('cantidad').in('venta_id', ventaIds)
