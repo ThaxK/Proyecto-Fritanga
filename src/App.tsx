@@ -25,7 +25,7 @@ const PANTALLAS: { id: Pantalla; etiqueta: string }[] = [
 ]
 
 export default function App() {
-  const [pantalla, setPantalla] = useState<Pantalla>('apertura')
+  const [pantalla, setPantalla] = useState<Pantalla>('reportes')
   const [turnoAbierto, setTurnoAbierto] = useState(false)
   const [verificandoTurno, setVerificandoTurno] = useState(true)
   const [cuentaId, setCuentaId] = useState<number | null>(null)
@@ -47,14 +47,14 @@ export default function App() {
           .limit(1)
         if (!error && data && data.length > 0) {
           setTurnoAbierto(true)
-          if (!cuentaId) setPantalla('venta')
+          setPantalla('venta')
         } else {
           setTurnoAbierto(false)
-          setPantalla('apertura')
+          setPantalla('reportes')
         }
       } catch {
         setTurnoAbierto(false)
-        setPantalla('apertura')
+        setPantalla('reportes')
       } finally {
         setVerificandoTurno(false)
       }
@@ -94,16 +94,6 @@ export default function App() {
     )
   }
 
-  if (pantalla === 'apertura' && !turnoAbierto) {
-    return (
-      <AperturaTurno
-        onTurnoAbierto={() => {
-          setTurnoAbierto(true)
-          setPantalla('venta')
-        }}
-      />
-    )
-  }
 
   return (
     <div className="flex min-h-full flex-col">
@@ -115,9 +105,20 @@ export default function App() {
 
       <header className="flex items-center justify-between bg-white px-4 py-3 shadow-sm sticky top-0 z-20">
         <span className="font-bold">🍟 Fritanga</span>
-        <span className="text-sm text-neutral-500">
-          {new Date().toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-neutral-500">
+            {new Date().toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
+          </span>
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-bold ${
+              turnoAbierto
+                ? 'bg-green-100 text-green-700'
+                : 'bg-red-100 text-red-700'
+            }`}
+          >
+            {turnoAbierto ? '🟢 Turno abierto' : '🔴 Turno cerrado'}
+          </span>
+        </div>
       </header>
 
       <nav className="sticky top-14 z-15 bg-white border-b border-neutral-200 px-2 py-1 shadow-sm">
@@ -126,22 +127,39 @@ export default function App() {
             <button
               key={p.id}
               onClick={() => {
+                if ((p.id === 'venta' || p.id === 'cuentas') && !turnoAbierto) return
                 setPantalla(p.id)
                 window.location.hash = ''
                 setCuentaId(null)
                 setCuentaEtiqueta(null)
               }}
+              disabled={!turnoAbierto && (p.id === 'venta' || p.id === 'cuentas')}
               className={`flex-shrink-0 min-w-[80px] max-w-[120px] rounded-xl text-xs font-semibold py-2 px-3 whitespace-nowrap ${
                 pantalla === p.id
                   ? 'bg-orange-500 text-white shadow-sm'
+                  : !turnoAbierto && (p.id === 'venta' || p.id === 'cuentas')
+                  ? 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
                   : 'text-neutral-600 active:bg-neutral-100'
               }`}
             >
               {p.etiqueta}
+              {!turnoAbierto && (p.id === 'venta' || p.id === 'cuentas') && ' ⚠️'}
             </button>
           ))}
         </div>
       </nav>
+
+      {!turnoAbierto && (
+        <div className="bg-yellow-50 border border-yellow-200 p-3 text-center">
+          <p className="text-sm text-yellow-800 font-medium">No hay turno abierto</p>
+          <button
+            onClick={() => setPantalla('apertura')}
+            className="mt-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white active:bg-orange-600"
+          >
+            Iniciar turno
+          </button>
+        </div>
+      )}
 
       <main className="flex-1 pb-20">
         {pantalla === 'venta' && <VentaRapida 
@@ -157,6 +175,14 @@ export default function App() {
             <p className="text-green-600 font-medium">✅ Turno ya abierto</p>
             <p className="text-sm text-neutral-500 mt-1">Usa la barra superior para navegar</p>
           </div>
+        )}
+        {pantalla === 'apertura' && !turnoAbierto && (
+          <AperturaTurno
+            onTurnoAbierto={() => {
+              setTurnoAbierto(true)
+              setPantalla('venta')
+            }}
+          />
         )}
       </main>
     </div>
