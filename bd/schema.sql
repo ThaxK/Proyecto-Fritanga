@@ -61,6 +61,18 @@ create table if not exists conteo_inicial (
   unique (turno_id, producto_id)
 );
 
+create table if not exists stock_agregado (
+  id bigint generated always as identity primary key,
+  turno_id bigint not null references turno(id),
+  producto_id bigint not null references producto(id),
+  cantidad integer not null check (cantidad > 0),
+  creado_el timestamptz not null default now(),
+  creado_por text not null default ''
+);
+
+create index if not exists ix_stock_agregado_turno on stock_agregado (turno_id);
+create index if not exists ix_stock_agregado_producto on stock_agregado (producto_id);
+
 create table if not exists cuenta (
   id bigint generated always as identity primary key,
   turno_id bigint not null references turno(id),
@@ -213,12 +225,18 @@ select
   p.orden,
   p.imagen_url,
   coalesce(ci.cantidad, 0) as inicial,
+  coalesce(sa.total_agregado, 0) as agregado,
   coalesce(vd.vendidos, 0) as vendidos,
-  coalesce(ci.cantidad, 0) - coalesce(vd.vendidos, 0) as teorico
+  coalesce(ci.cantidad, 0) + coalesce(sa.total_agregado, 0) - coalesce(vd.vendidos, 0) as teorico
 from turno t
 cross join producto p
 left join conteo_inicial ci
   on ci.turno_id = t.id and ci.producto_id = p.id
+left join (
+  select turno_id, producto_id, sum(cantidad) as total_agregado
+  from stock_agregado
+  group by turno_id, producto_id
+) sa on sa.turno_id = t.id and sa.producto_id = p.id
 left join (
   select v.turno_id, d.producto_id, sum(d.cantidad) as vendidos
   from detalle_venta d
@@ -971,12 +989,21 @@ begin
     raise exception 'TURNO_CERRADO: no hay turno abierto';
   end if;
 
-  -- insertar o actualizar el conteo inicial del producto
-  insert into conteo_inicial (turno_id, producto_id, cantidad)
-  values (v_turno_id, p_producto_id, p_cantidad)
-  on conflict (turno_id, producto_id)
-  do update set cantidad = conteo_inicial.cantidad + excluded.cantidad
-  returning cantidad into v_nuevo_total;
+  -- registrar el reabastecimiento en stock_agregado (no toca conteo_inicial)
+  insert into stock_agregado (turno_id, producto_id, cantidad, creado_por)
+  values (v_turno_id, p_producto_id, p_cantidad, coalesce(p_operador, ''));
+
+  -- nuevo total disponible = conteo_inicial + todo lo agregado en el turno
+  select coalesce(ci.cantidad, 0) + coalesce(sa.total_agregado, 0)
+    into v_nuevo_total
+    from conteo_inicial ci
+    left join (
+      select turno_id, producto_id, sum(cantidad) as total_agregado
+      from stock_agregado
+      where turno_id = v_turno_id and producto_id = p_producto_id
+      group by turno_id, producto_id
+    ) sa on sa.turno_id = ci.turno_id and sa.producto_id = ci.producto_id
+   where ci.turno_id = v_turno_id and ci.producto_id = p_producto_id;
 
   return jsonb_build_object(
     'producto_id', p_producto_id,
@@ -1095,7 +1122,7 @@ begin
   select
     v_turno_id,
     ci.producto_id,
-    ci.cantidad - coalesce(vd.vendidos, 0),
+    coalesce(ci.cantidad, 0) + coalesce(sa.total_agregado, 0) - coalesce(vd.vendidos, 0),
     (select max((it->>'cantidad')::integer)
      from jsonb_array_elements(p_conteos_fisicos) it
      where (it->>'producto_id')::bigint = ci.producto_id)
@@ -1107,6 +1134,12 @@ begin
     where v.turno_id = v_turno_id
     group by d.producto_id
   ) vd on vd.producto_id = ci.producto_id
+  left join (
+    select turno_id, producto_id, sum(cantidad) as total_agregado
+    from stock_agregado
+    where turno_id = v_turno_id
+    group by turno_id, producto_id
+  ) sa on sa.turno_id = ci.turno_id and sa.producto_id = ci.producto_id
   where ci.turno_id = v_turno_id
   on conflict (turno_id, producto_id)
   do update set teorico = excluded.teorico, fisico = excluded.fisico;
