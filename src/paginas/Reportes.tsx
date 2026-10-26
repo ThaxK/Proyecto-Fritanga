@@ -47,8 +47,6 @@ export default function Reportes() {
       const fecha = fechaSeleccionada
       // Fronteras del día del negocio, ya convertidas a instantes UTC.
       const { desde, hasta } = rangoDiaZona(fecha)
-      console.log('[Reportes] Fecha seleccionada:', fecha)
-      console.log('[Reportes] Rango desde/hasta:', desde, hasta)
 
       // 1. Ventas del día (mostrador y cobros de cuenta)
       const { data: ventasDia, error: errVentas } = await supabase!
@@ -59,7 +57,6 @@ export default function Reportes() {
         .in('tipo', ['mostrador', 'cobro_cuenta'])
       if (errVentas) throw errVentas
       const ventasDiaData = ventasDia ?? []
-      console.log('[Reportes] Ventas del día (mostrador+cobro_cuenta):', ventasDiaData.length, ventasDiaData.map(v => ({ id: v.id, tipo: v.tipo, total: v.total_cop, creada: v.creada_el })))
       // Tanto mostrador como cobro_cuenta entran por efectivo en caja
       const totalEfectivo = ventasDiaData.reduce((s, v) => s + v.total_cop, 0)
       const numVentas = ventasDiaData.length
@@ -74,7 +71,6 @@ export default function Reportes() {
         .lt('creada_el', hasta)
       if (errTodasVentas) throw errTodasVentas
       const ventaIds = (todasVentasDia ?? []).map(v => v.id)
-      console.log('[Reportes] Todas las ventas del día:', todasVentasDia?.length, 'ventaIds:', ventaIds)
       let totalProductos = 0
       if (ventaIds.length > 0) {
         const { data: items } = await supabase!.from('detalle_venta').select('cantidad').in('venta_id', ventaIds)
@@ -88,33 +84,28 @@ export default function Reportes() {
         .select('cantidad, precio_unit_cop, subtotal_cop, producto:producto_id (nombre)')
         .in('venta_id', ventaIds.length > 0 ? ventaIds : [0])
 
-      console.log('[Reportes] Detalle_venta encontrados:', (itemsVendidos ?? []).length, itemsVendidos ?? [])
-
-      const productosMap = new Map<number, { nombre: string; unidades: number; total: number }>()
+      const productosMap = new Map<string, { nombre: string; unidades: number; total: number }>()
       let totalVentasDesdeDetalles = 0
       ;(itemsVendidos ?? []).forEach(item => {
-        const pid = (item as any).producto_id
         const producto = (item as any).producto
         const nombre = producto && producto.nombre ? producto.nombre : 'Sin nombre'
-        const existing = productosMap.get(pid) || { nombre, unidades: 0, total: 0 }
+        const existing = productosMap.get(nombre) || { nombre, unidades: 0, total: 0 }
         existing.unidades += item.cantidad
         existing.total += item.subtotal_cop
         totalVentasDesdeDetalles += item.subtotal_cop
-        productosMap.set(pid, existing)
+        productosMap.set(nombre, existing)
       })
 
       const ventasProducto = Array.from(productosMap.entries())
-        .map(([id, data]) => ({
-          producto_id: id,
-          nombre: data.nombre,
+        .map(([nombre, data]) => ({
+          producto_id: 0, // no disponible desde el join; se agrupa por nombre
+          nombre,
           unidades: data.unidades,
           total_cop: data.total,
           // Porcentaje sobre el total de detalles, no sobre total_cop de venta
           porcentaje: totalVentasDesdeDetalles > 0 ? (data.total / totalVentasDesdeDetalles) * 100 : 0,
         }))
         .sort((a, b) => b.total_cop - a.total_cop)
-
-      console.log('[Reportes] Productos del día:', ventasProducto)
 
       // 4. Ventas por hora - usando objeto simple en lugar de Map
       const ventasHoraMap: Record<number, VentaPorHora> = {}
@@ -129,7 +120,6 @@ export default function Reportes() {
       const ventasHora = Object.values(ventasHoraMap).sort((a, b) => a.hora - b.hora)
 
       setResumen({ fecha: fechaSeleccionada, total_ventas: totalVentasDesdeDetalles, total_efectivo: totalEfectivo, total_productos: totalProductos, num_ventas: numVentas, num_cuentas: numCuentas })
-      console.log('[Reportes] Resumen final:', { fecha: fechaSeleccionada, total_ventas: totalVentasDesdeDetalles, total_efectivo: totalEfectivo, total_productos: totalProductos, num_ventas: numVentas, num_cuentas: numCuentas })
       setVentasProducto(ventasProducto)
       setVentasHora(ventasHora)
     } catch (e) {
@@ -184,7 +174,7 @@ export default function Reportes() {
             <h2 className="font-semibold">🏆 Ventas por producto</h2>
             <div className="space-y-2">
               {ventasProducto.map((p, i) => (
-                <div key={p.producto_id} className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
+                <div key={p.nombre} className="bg-white rounded-xl p-3 shadow-sm flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="bg-orange-100 text-orange-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">{i + 1}</span>
                     <div><div className="font-medium truncate max-w-[200px]">{p.nombre}</div><div className="text-xs text-neutral-500">{p.unidades} unds • {p.porcentaje.toFixed(1)}% del total</div></div>
