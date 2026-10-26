@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import AperturaTurno from './paginas/AperturaTurno'
 import CierreCaja from './paginas/CierreCaja'
 import CuentasAbiertas from './paginas/CuentasAbiertas'
+import HistorialVentas from './paginas/HistorialVentas'
 import Inventario from './paginas/Inventario'
 import Reportes from './paginas/Reportes'
 import VentaRapida from './paginas/VentaRapida'
@@ -14,6 +15,7 @@ type Pantalla =
   | 'inventario'
   | 'cierre'
   | 'reportes'
+  | 'historial'
 
 const PANTALLAS: { id: Pantalla; etiqueta: string }[] = [
   { id: 'venta', etiqueta: '🛒 Venta' },
@@ -22,6 +24,7 @@ const PANTALLAS: { id: Pantalla; etiqueta: string }[] = [
   { id: 'apertura', etiqueta: '📅 Turno' },
   { id: 'cierre', etiqueta: '💵 Cierre' },
   { id: 'reportes', etiqueta: '📊 Reportes' },
+  { id: 'historial', etiqueta: '🧾 Historial' },
 ]
 
 export default function App() {
@@ -170,6 +173,7 @@ export default function App() {
         {pantalla === 'inventario' && <Inventario />}
         {pantalla === 'cierre' && <CierreCaja onVolver={() => { setPantalla('apertura'); setTurnoAbierto(false); }} />}
         {pantalla === 'reportes' && <Reportes />}
+        {pantalla === 'historial' && <HistorialVentas />}
         {pantalla === 'apertura' && turnoAbierto && (
           <div className="p-6 text-center">
             <p className="text-green-600 font-medium">✅ Turno ya abierto</p>
