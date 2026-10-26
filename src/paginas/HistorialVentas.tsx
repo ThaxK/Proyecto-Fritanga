@@ -19,11 +19,24 @@ interface VentaHistorico {
   cuenta?: { etiqueta: string; numero: number } | null
 }
 
+interface ItemDetalle {
+  producto_id: number
+  nombre: string
+  cantidad: number
+  precio_unit_cop: number
+  subtotal_cop: number
+}
+
 export default function HistorialVentas() {
   const [ventas, setVentas] = useState<VentaHistorico[]>([])
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => fechaHoyZona())
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Detalle de una venta específica (modal)
+  const [detalleId, setDetalleId] = useState<number | null>(null)
+  const [itemsDetalle, setItemsDetalle] = useState<ItemDetalle[]>([])
+  const [cargandoDetalle, setCargandoDetalle] = useState(false)
 
   const cargarVentas = useCallback(async () => {
     if (!supabaseConfigurado) return
@@ -50,6 +63,42 @@ export default function HistorialVentas() {
     }
   }, [fechaSeleccionada])
 
+  const cargarDetalleVenta = useCallback(async (ventaId: number) => {
+    if (!supabaseConfigurado) return
+    setCargandoDetalle(true)
+    setError(null)
+    try {
+      const { data, error: err } = await supabase!
+        .from('detalle_venta')
+        .select(
+          'producto_id, cantidad, precio_unit_cop, subtotal_cop, producto:producto_id (nombre)'
+        )
+        .eq('venta_id', ventaId)
+        .order('producto_id')
+      if (err) throw err
+      setItemsDetalle(
+        (data ?? []).map(d => ({
+          producto_id: d.producto_id,
+          nombre: (d as any).producto?.nombre || 'Producto',
+          cantidad: d.cantidad,
+          precio_unit_cop: d.precio_unit_cop,
+          subtotal_cop: d.subtotal_cop,
+        }))
+      )
+      setDetalleId(ventaId)
+    } catch (e) {
+      setError('Error cargando detalle: ' + (e as Error).message)
+    } finally {
+      setCargandoDetalle(false)
+    }
+  }, [])
+
+  const cerrarDetalle = () => {
+    setDetalleId(null)
+    setItemsDetalle([])
+    setError(null)
+  }
+
   useEffect(() => {
     cargarVentas()
   }, [cargarVentas])
@@ -70,7 +119,9 @@ export default function HistorialVentas() {
     return 'Mostrador'
   }
 
-  if (cargando) {
+  const estaSeleccionada = (id: number) => id === detalleId
+
+  if (cargando && detalleId === null) {
     return (
       <div className="flex min-h-full items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent"></div>
@@ -144,8 +195,15 @@ export default function HistorialVentas() {
                 {ventas.map(v => {
                   const fecha = fechaHoyZona(new Date(v.creada_el))
                   const hm = horaMinutoEnZona(v.creada_el)
+                  const seleccionada = estaSeleccionada(v.id)
                   return (
-                    <tr key={v.id} className="hover:bg-neutral-50">
+                    <tr
+                      key={v.id}
+                      onClick={() => cargarDetalleVenta(v.id)}
+                      className={`hover:bg-neutral-50 cursor-pointer ${
+                        seleccionada ? 'bg-blue-50' : ''
+                      }`}
+                    >
                       <td className="pb-3 pl-4 font-medium text-neutral-900">{fecha}</td>
                       <td className="pb-3 pl-4 font-mono text-neutral-700">{hm}</td>
                       <td className="pb-3 pl-4 text-sm">
@@ -171,6 +229,75 @@ export default function HistorialVentas() {
           </div>
         )}
       </main>
+
+      {/* Modal de detalle de venta */}
+      {detalleId !== null && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b bg-orange-50 rounded-t-2xl">
+              <h2 className="font-bold text-lg">Detalle de venta #{detalleId}</h2>
+              <button
+                onClick={cerrarDetalle}
+                className="text-neutral-400 hover:text-neutral-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {cargandoDetalle && (
+              <div className="flex min-h-[200px] items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-4 border-orange-500 border-t-transparent"></div>
+              </div>
+            )}
+
+            {!cargandoDetalle && itemsDetalle.length > 0 && (
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[60vh]">
+                <div className="flex justify-between text-sm text-neutral-500 border-b pb-2 mb-2">
+                  <span className="font-medium">Producto</span>
+                  <span className="text-right font-mono">Cant.</span>
+                  <span className="text-right font-mono">Precio</span>
+                  <span className="text-right font-mono">Subtotal</span>
+                </div>
+                {itemsDetalle.map(item => (
+                  <div key={item.producto_id} className="flex justify-between items-center py-2 border-b border-neutral-100 last:border-0">
+                    <span className="text-sm truncate max-w-[120px]">{item.nombre}</span>
+                    <div className="text-right font-mono text-sm w-16">
+                      {item.cantidad}
+                    </div>
+                    <div className="text-right font-mono text-sm w-20">
+                      ${item.precio_unit_cop.toLocaleString()}
+                    </div>
+                    <div className="text-right font-mono text-sm font-bold w-24">
+                      ${item.subtotal_cop.toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+                <div className="mt-4 pt-4 border-t flex justify-between text-sm">
+                  <span className="text-neutral-500">Total detalle</span>
+                  <span className="font-bold font-mono text-neutral-900 text-right w-24">
+                    ${itemsDetalle.reduce((s, i) => s + i.subtotal_cop, 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!cargandoDetalle && itemsDetalle.length === 0 && (
+              <div className="flex-1 flex items-center justify-center p-8">
+                <p className="text-neutral-500 text-sm">Sin ítems registrados</p>
+              </div>
+            )}
+
+            <div className="p-4 border-t bg-neutral-50 rounded-b-2xl">
+              <button
+                onClick={cerrarDetalle}
+                className="w-full rounded-xl bg-neutral-200 py-3 text-base font-semibold text-neutral-700 active:bg-neutral-300"
+              >
+                Cerrar detalle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
