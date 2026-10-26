@@ -47,6 +47,8 @@ export default function Reportes() {
       const fecha = fechaSeleccionada
       // Fronteras del día del negocio, ya convertidas a instantes UTC.
       const { desde, hasta } = rangoDiaZona(fecha)
+      console.log('[Reportes] Fecha seleccionada:', fecha)
+      console.log('[Reportes] Rango desde/hasta:', desde, hasta)
 
       // 1. Ventas del día (mostrador y cobros de cuenta)
       const { data: ventasDia, error: errVentas } = await supabase!
@@ -57,6 +59,7 @@ export default function Reportes() {
         .in('tipo', ['mostrador', 'cobro_cuenta'])
       if (errVentas) throw errVentas
       const ventasDiaData = ventasDia ?? []
+      console.log('[Reportes] Ventas del día (mostrador+cobro_cuenta):', ventasDiaData.length, ventasDiaData.map(v => ({ id: v.id, tipo: v.tipo, total: v.total_cop, creada: v.creada_el })))
       // Tanto mostrador como cobro_cuenta entran por efectivo en caja
       const totalEfectivo = ventasDiaData.reduce((s, v) => s + v.total_cop, 0)
       const numVentas = ventasDiaData.length
@@ -71,6 +74,7 @@ export default function Reportes() {
         .lt('creada_el', hasta)
       if (errTodasVentas) throw errTodasVentas
       const ventaIds = (todasVentasDia ?? []).map(v => v.id)
+      console.log('[Reportes] Todas las ventas del día:', todasVentasDia?.length, 'ventaIds:', ventaIds)
       let totalProductos = 0
       if (ventaIds.length > 0) {
         const { data: items } = await supabase!.from('detalle_venta').select('cantidad').in('venta_id', ventaIds)
@@ -83,6 +87,8 @@ export default function Reportes() {
         .from('detalle_venta')
         .select('cantidad, precio_unit_cop, subtotal_cop, producto:producto_id (nombre)')
         .in('venta_id', ventaIds.length > 0 ? ventaIds : [0])
+
+      console.log('[Reportes] Detalle_venta encontrados:', (itemsVendidos ?? []).length, itemsVendidos ?? [])
 
       const productosMap = new Map<number, { nombre: string; unidades: number; total: number }>()
       let totalVentasDesdeDetalles = 0
@@ -108,6 +114,8 @@ export default function Reportes() {
         }))
         .sort((a, b) => b.total_cop - a.total_cop)
 
+      console.log('[Reportes] Productos del día:', ventasProducto)
+
       // 4. Ventas por hora - usando objeto simple en lugar de Map
       const ventasHoraMap: Record<number, VentaPorHora> = {}
       ventasDiaData.forEach(v => {
@@ -121,6 +129,7 @@ export default function Reportes() {
       const ventasHora = Object.values(ventasHoraMap).sort((a, b) => a.hora - b.hora)
 
       setResumen({ fecha: fechaSeleccionada, total_ventas: totalVentasDesdeDetalles, total_efectivo: totalEfectivo, total_productos: totalProductos, num_ventas: numVentas, num_cuentas: numCuentas })
+      console.log('[Reportes] Resumen final:', { fecha: fechaSeleccionada, total_ventas: totalVentasDesdeDetalles, total_efectivo: totalEfectivo, total_productos: totalProductos, num_ventas: numVentas, num_cuentas: numCuentas })
       setVentasProducto(ventasProducto)
       setVentasHora(ventasHora)
     } catch (e) {
