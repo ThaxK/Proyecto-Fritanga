@@ -163,6 +163,19 @@ export default function HistorialVentas() {
 
   const estaSeleccionada = (id: number) => id === detalleId
 
+  // Agrupar ítems por producto: sumar cantidades y subtotales
+  const itemsAgrupadosMap = new Map<number, ItemDetalle>()
+  itemsDetalle.forEach(item => {
+    const existente = itemsAgrupadosMap.get(item.producto_id)
+    if (existente) {
+      existente.cantidad += item.cantidad
+      existente.subtotal_cop += item.subtotal_cop
+    } else {
+      itemsAgrupadosMap.set(item.producto_id, { ...item })
+    }
+  })
+  const itemsAgrupados = Array.from(itemsAgrupadosMap.values())
+
   if (cargando && detalleId === null) {
     return (
       <div className="flex min-h-full items-center justify-center">
@@ -300,7 +313,7 @@ export default function HistorialVentas() {
                   <span className="text-right font-mono">Precio</span>
                   <span className="text-right font-mono">Subtotal</span>
                 </div>
-                {itemsDetalle.map(item => (
+                {Array.from(itemsAgrupados.values()).map(item => (
                   <div key={item.producto_id} className="flex justify-between items-center py-2 border-b border-neutral-100 last:border-0">
                     <span className="text-sm truncate max-w-[120px]">{item.nombre}</span>
                     <div className="text-right font-mono text-sm w-16">
