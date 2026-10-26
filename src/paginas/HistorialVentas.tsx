@@ -29,7 +29,10 @@ interface ItemDetalle {
 
 export default function HistorialVentas() {
   const [ventas, setVentas] = useState<VentaHistorico[]>([])
+  const [totalVentas, setTotalVentas] = useState(0)
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => fechaHoyZona())
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,24 +47,27 @@ export default function HistorialVentas() {
     setError(null)
     try {
       const { desde, hasta } = rangoDiaZona(fechaSeleccionada)
-      const { data, error: err } = await supabase!
+      const { data, error: err, count } = await supabase!
         .from('venta')
         .select(
           `id, total_cop, tipo, cuenta_id, creada_el, recibido_cop, vuelto_cop,
-           cuenta (etiqueta, numero)`
+           cuenta (etiqueta, numero)`,
+          { count: 'exact' }
         )
         .in('tipo', ['mostrador', 'cobro_cuenta'])
         .gte('creada_el', desde)
         .lt('creada_el', hasta)
         .order('creada_el', { ascending: false })
+        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
       if (err) throw err
       setVentas((data ?? []) as unknown as VentaHistorico[])
+      setTotalVentas(count ?? 0)
     } catch (e) {
       setError('Error cargando historial: ' + (e as Error).message)
     } finally {
       setCargando(false)
     }
-  }, [fechaSeleccionada])
+  }, [fechaSeleccionada, page])
 
   const cargarDetalleVenta = useCallback(async (ventaId: number) => {
     if (!supabaseConfigurado) return
@@ -141,12 +147,20 @@ export default function HistorialVentas() {
     setError(null)
   }
 
+  // Resetear página al cambiar de fecha
+  useEffect(() => {
+    setPage(1)
+  }, [fechaSeleccionada])
+
   useEffect(() => {
     cargarVentas()
   }, [cargarVentas])
 
   const hoy = fechaHoyZona()
   const ayer = desplazarFecha(hoy, -1)
+
+  const totalPaginas = Math.ceil(totalVentas / PAGE_SIZE) || 1
+  const paginaValida = Math.min(Math.max(page, 1), totalPaginas)
 
   const tipoLabel = (tipo: string) => {
     if (tipo === 'mostrador') return 'Mostrador'
@@ -281,6 +295,31 @@ export default function HistorialVentas() {
                 })}
               </tbody>
             </table>
+
+            {/* Paginación */}
+            <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-b-xl">
+              <div className="text-sm text-neutral-600">
+                Página <span className="font-medium">{paginaValida}</span> de{" "}
+                <span className="font-medium">{totalPaginas}</span>{' '}
+                ({totalVentas} ventas totales)
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(p - 1, 1))}
+                  disabled={paginaValida <= 1}
+                  className="rounded-xl px-3 py-1.5 text-sm font-medium ${paginaValida <= 1 ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : 'bg-white border border-neutral-300 text-orange-700 active:bg-neutral-100'}"
+                >
+                  ← Anterior
+                </button>
+                <button
+                  onClick={() => setPage(p => Math.min(p + 1, totalPaginas))}
+                  disabled={paginaValida >= totalPaginas}
+                  className="rounded-xl px-3 py-1.5 text-sm font-medium ${paginaValida >= totalPaginas ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' : 'bg-white border border-neutral-300 text-orange-700 active:bg-neutral-100'}"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>
