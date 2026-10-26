@@ -106,6 +106,12 @@ export function horaEnZona(instante: string | Date): number {
   return p('hour')
 }
 
+/** Hora y minuto (HH:mm) del instante en la zona del negocio. */
+export function horaMinutoEnZona(instante: string | Date): string {
+  const p = leerPartes(new Date(instante), { hour: '2-digit', minute: '2-digit' })
+  return `${String(p('hour')).padStart(2, '0')}:${String(p('minute')).padStart(2, '0')}`
+}
+
 /**
  * Fecha en palabras para mostrar al operador. Se ancla a UTC a propósito: acá
  * `fecha` es un día de calendario, no un instante, así que no debe pasar por la

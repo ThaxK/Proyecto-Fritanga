@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase, supabaseConfigurado } from '../servicios/supabase'
 import {
   fechaHoyZona,
-  horaEnZona,
+  horaMinutoEnZona,
   rangoDiaZona,
   desplazarFecha,
   formatearFechaLarga,
@@ -143,11 +143,11 @@ export default function HistorialVentas() {
               <tbody className="divide-y divide-neutral-100">
                 {ventas.map(v => {
                   const fecha = fechaHoyZona(new Date(v.creada_el))
-                  const hora = horaEnZona(v.creada_el)
+                  const hm = horaMinutoEnZona(v.creada_el)
                   return (
                     <tr key={v.id} className="hover:bg-neutral-50">
                       <td className="pb-3 pl-4 font-medium text-neutral-900">{fecha}</td>
-                      <td className="pb-3 pl-4 font-mono text-neutral-700">{hora}:00</td>
+                      <td className="pb-3 pl-4 font-mono text-neutral-700">{hm}</td>
                       <td className="pb-3 pl-4 text-sm">
                         <span
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
