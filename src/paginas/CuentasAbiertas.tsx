@@ -299,29 +299,6 @@ export default function CuentasAbiertas({ onVolver }: { onVolver: () => void }) 
     setCobrando(false)
   }
 
-  // Fallback visual si hay error de render (hooks al inicio)
-  const [renderError, setRenderError] = useState<Error | null>(null)
-
-  if (cargando) {
-    return (
-      <div className="flex min-h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent"></div>
-      </div>
-    )
-  }
-
-  if (renderError) {
-    return (
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-w-md text-center">
-          <h2 className="font-semibold text-red-700 mb-2">Error en Cuentas</h2>
-          <pre className="text-left text-xs bg-red-100 p-2 rounded overflow-auto">{renderError.message}</pre>
-          <button onClick={() => setRenderError(null)} className="mt-3 text-sm text-orange-600 underline">Reintentar</button>
-        </div>
-      </div>
-    )
-  }
-
   if (cargando) {
     return (
       <div className="flex min-h-full items-center justify-center">
