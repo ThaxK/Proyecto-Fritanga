@@ -68,23 +68,65 @@ export default function HistorialVentas() {
     setCargandoDetalle(true)
     setError(null)
     try {
-      const { data, error: err } = await supabase!
-        .from('detalle_venta')
-        .select(
-          'producto_id, cantidad, precio_unit_cop, subtotal_cop, producto:producto_id (nombre)'
-        )
-        .eq('venta_id', ventaId)
-        .order('producto_id')
-      if (err) throw err
-      setItemsDetalle(
-        (data ?? []).map(d => ({
+      // Buscar la venta para saber su tipo y cuenta_id
+      const { data: ventaData, error: errVenta } = await supabase!
+        .from('venta')
+        .select('tipo, cuenta_id')
+        .eq('id', ventaId)
+        .single()
+      if (errVenta) throw errVenta
+      const venta = ventaData as { tipo: string; cuenta_id: number | null }
+
+      let items: ItemDetalle[] = []
+
+      if (venta.tipo === 'mostrador') {
+        // Venta directa: los ítems están en detalle_venta de esta venta
+        const { data, error: err } = await supabase!
+          .from('detalle_venta')
+          .select(
+            'producto_id, cantidad, precio_unit_cop, subtotal_cop, producto:producto_id (nombre)'
+          )
+          .eq('venta_id', ventaId)
+          .order('producto_id')
+        if (err) throw err
+        items = (data ?? []).map(d => ({
           producto_id: d.producto_id,
           nombre: (d as any).producto?.nombre || 'Producto',
           cantidad: d.cantidad,
           precio_unit_cop: d.precio_unit_cop,
           subtotal_cop: d.subtotal_cop,
         }))
-      )
+      } else if (venta.tipo === 'cobro_cuenta' && venta.cuenta_id) {
+        // Cobro de cuenta: los ítems están en las ventas tipo 'cuenta' de esa cuenta
+        const { data: ventasCuenta, error: errVentas } = await supabase!
+          .from('venta')
+          .select('id')
+          .eq('cuenta_id', venta.cuenta_id)
+          .eq('tipo', 'cuenta')
+        if (errVentas) throw errVentas
+        const ventaIds = (ventasCuenta ?? []).map(v => v.id)
+        if (ventaIds.length > 0) {
+          const { data, error: err } = await supabase!
+            .from('detalle_venta')
+            .select(
+              'producto_id, cantidad, precio_unit_cop, subtotal_cop, producto:producto_id (nombre)'
+            )
+            .in('venta_id', ventaIds)
+            .order('producto_id')
+          if (err) throw err
+          items = (data ?? []).map(d => ({
+            producto_id: d.producto_id,
+            nombre: (d as any).producto?.nombre || 'Producto',
+            cantidad: d.cantidad,
+            precio_unit_cop: d.precio_unit_cop,
+            subtotal_cop: d.subtotal_cop,
+          }))
+        }
+      }
+      // tipo 'cuenta' (abierta, no cobrada): no debería aparecer en el historial,
+      // pero si lo hace, no tiene detalle propio
+
+      setItemsDetalle(items)
       setDetalleId(ventaId)
     } catch (e) {
       setError('Error cargando detalle: ' + (e as Error).message)
