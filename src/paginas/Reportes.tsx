@@ -57,7 +57,6 @@ export default function Reportes() {
         .in('tipo', ['mostrador', 'cobro_cuenta'])
       if (errVentas) throw errVentas
       const ventasDiaData = ventasDia ?? []
-      const totalVentas = ventasDiaData.reduce((s, v) => s + v.total_cop, 0)
       // Tanto mostrador como cobro_cuenta entran por efectivo en caja
       const totalEfectivo = ventasDiaData.reduce((s, v) => s + v.total_cop, 0)
       const numVentas = ventasDiaData.length
@@ -78,24 +77,35 @@ export default function Reportes() {
         totalProductos = (items ?? []).reduce((s, i) => s + i.cantidad, 0)
       }
 
-      // 3. Ventas por producto
+      // 3. Ventas por producto: se calcula a partir de los detalles reales,
+      // no de total_cop de la venta, para que el porcentaje sea consistente.
       const { data: itemsVendidos } = await supabase!
         .from('detalle_venta')
         .select('cantidad, precio_unit_cop, subtotal_cop, producto:producto_id (nombre)')
         .in('venta_id', ventaIds.length > 0 ? ventaIds : [0])
 
       const productosMap = new Map<number, { nombre: string; unidades: number; total: number }>()
+      let totalVentasDesdeDetalles = 0
       ;(itemsVendidos ?? []).forEach(item => {
         const pid = (item as any).producto_id
-        const nombre = (item as any).producto?.nombre || 'Sin nombre'
+        const producto = (item as any).producto
+        const nombre = producto && producto.nombre ? producto.nombre : 'Sin nombre'
         const existing = productosMap.get(pid) || { nombre, unidades: 0, total: 0 }
         existing.unidades += item.cantidad
         existing.total += item.subtotal_cop
+        totalVentasDesdeDetalles += item.subtotal_cop
         productosMap.set(pid, existing)
       })
 
       const ventasProducto = Array.from(productosMap.entries())
-        .map(([id, data]) => ({ producto_id: id, nombre: data.nombre, unidades: data.unidades, total_cop: data.total, porcentaje: totalVentas > 0 ? (data.total / totalVentas) * 100 : 0 }))
+        .map(([id, data]) => ({
+          producto_id: id,
+          nombre: data.nombre,
+          unidades: data.unidades,
+          total_cop: data.total,
+          // Porcentaje sobre el total de detalles, no sobre total_cop de venta
+          porcentaje: totalVentasDesdeDetalles > 0 ? (data.total / totalVentasDesdeDetalles) * 100 : 0,
+        }))
         .sort((a, b) => b.total_cop - a.total_cop)
 
       // 4. Ventas por hora - usando objeto simple en lugar de Map
@@ -110,7 +120,7 @@ export default function Reportes() {
       })
       const ventasHora = Object.values(ventasHoraMap).sort((a, b) => a.hora - b.hora)
 
-      setResumen({ fecha: fechaSeleccionada, total_ventas: totalVentas, total_efectivo: totalEfectivo, total_productos: totalProductos, num_ventas: numVentas, num_cuentas: numCuentas })
+      setResumen({ fecha: fechaSeleccionada, total_ventas: totalVentasDesdeDetalles, total_efectivo: totalEfectivo, total_productos: totalProductos, num_ventas: numVentas, num_cuentas: numCuentas })
       setVentasProducto(ventasProducto)
       setVentasHora(ventasHora)
     } catch (e) {
