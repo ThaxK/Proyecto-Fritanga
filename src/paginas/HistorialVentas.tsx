@@ -31,6 +31,7 @@ interface ItemDetalle {
 export default function HistorialVentas() {
   const [ventas, setVentas] = useState<VentaHistorico[]>([])
   const [totalVentas, setTotalVentas] = useState(0)
+  const [totalDia, setTotalDia] = useState(0)
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => fechaHoyZona())
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 10
@@ -48,21 +49,34 @@ export default function HistorialVentas() {
     setError(null)
     try {
       const { desde, hasta } = rangoDiaZona(fechaSeleccionada)
-      const { data, error: err, count } = await supabase!
-        .from('venta')
-        .select(
-          `id, total_cop, tipo, cuenta_id, creada_el, recibido_cop, vuelto_cop,
-           cuenta (etiqueta, numero)`,
-          { count: 'exact' }
-        )
-        .in('tipo', ['mostrador', 'cobro_cuenta'])
-        .gte('creada_el', desde)
-        .lt('creada_el', hasta)
-        .order('creada_el', { ascending: false })
-        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-      if (err) throw err
-      setVentas((data ?? []) as unknown as VentaHistorico[])
-      setTotalVentas(count ?? 0)
+      // Dos consultas en paralelo:
+      // 1. la página visible para la tabla (10 filas);
+      // 2. todos los totales del día, solo para las tarjetas de resumen.
+      const [pagina, totales] = await Promise.all([
+        supabase!
+          .from('venta')
+          .select(
+            `id, total_cop, tipo, cuenta_id, creada_el, recibido_cop, vuelto_cop,
+             cuenta (etiqueta, numero)`,
+            { count: 'exact' }
+          )
+          .in('tipo', ['mostrador', 'cobro_cuenta'])
+          .gte('creada_el', desde)
+          .lt('creada_el', hasta)
+          .order('creada_el', { ascending: false })
+          .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
+        supabase!
+          .from('venta')
+          .select('total_cop')
+          .in('tipo', ['mostrador', 'cobro_cuenta'])
+          .gte('creada_el', desde)
+          .lt('creada_el', hasta),
+      ])
+      if (pagina.error) throw pagina.error
+      if (totales.error) throw totales.error
+      setVentas((pagina.data ?? []) as unknown as VentaHistorico[])
+      setTotalVentas(pagina.count ?? 0)
+      setTotalDia((totales.data ?? []).reduce((s, v) => s + v.total_cop, 0))
     } catch (e) {
       setError('Error cargando historial: ' + (e as Error).message)
     } finally {
@@ -231,14 +245,14 @@ export default function HistorialVentas() {
         )}
 
         <div className="flex gap-2 p-3 bg-white rounded-xl shadow-sm">
-          <div className="bg-orange-50 rounded-xl p-3 text-center">
+          <div className="flex-1 bg-orange-50 rounded-xl p-3 text-center">
             <div className="text-xs text-orange-700">Ventas del día</div>
-            <div className="text-2xl font-bold text-orange-600">{ventas.length}</div>
+            <div className="text-2xl font-bold text-orange-600">{totalVentas}</div>
           </div>
-          <div className="bg-green-50 rounded-xl p-3 text-center">
+          <div className="flex-1 bg-green-50 rounded-xl p-3 text-center">
             <div className="text-xs text-green-700">Total facturado</div>
             <div className="text-2xl font-bold text-green-700">
-              ${ventas.reduce((s, v) => s + v.total_cop, 0).toLocaleString()}
+              ${totalDia.toLocaleString()}
             </div>
           </div>
         </div>
