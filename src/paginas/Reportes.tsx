@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, supabaseConfigurado } from '../servicios/supabase'
+import CalendarioVentas from '../componentes/CalendarioVentas'
 import {
   desplazarFecha,
   fechaHoyZona,
@@ -159,7 +160,7 @@ export default function Reportes() {
     <div className="flex flex-col min-h-full pb-24">
       <header className="sticky top-0 z-10 bg-white px-3 py-2 shadow-sm flex items-center justify-between">
         <h1 className="font-bold text-lg">📊 Reportes</h1>
-        <input type="date" value={fechaSeleccionada} onChange={e => setFechaSeleccionada(e.target.value)} className="rounded-xl border-2 border-neutral-300 bg-white px-3 py-2 text-base focus:border-orange-500 focus:outline-none" />
+        <CalendarioVentas fechaSeleccionada={fechaSeleccionada} onSeleccionar={setFechaSeleccionada} />
       </header>
 
       <main className="flex-1 p-3 space-y-4 overflow-y-auto pb-24">

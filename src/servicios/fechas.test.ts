@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  anioMesDe,
   desplazarFecha,
+  desplazarMes,
+  diaSemanaPrimerDia,
+  diasEnMes,
   fechaHoyZona,
   formatearFechaLarga,
   horaEnZona,
   rangoDiaZona,
+  rangoMesZona,
 } from './fechas'
 
 // America/Bogota es UTC-5 todo el año (Colombia no tiene horario de verano),
@@ -104,5 +109,60 @@ describe('formatearFechaLarga', () => {
     expect(texto).toContain('16')
     expect(texto).toContain('octubre')
     expect(texto).toContain('2026')
+  })
+})
+
+describe('rangoMesZona', () => {
+  it('cubre de 00:00 del día 1 a 00:00 del día 1 del mes siguiente, en UTC', () => {
+    expect(rangoMesZona(2026, 10)).toEqual({
+      desde: '2026-10-01T05:00:00.000Z',
+      hasta: '2026-11-01T05:00:00.000Z',
+    })
+  })
+
+  it('cruza fin de año', () => {
+    expect(rangoMesZona(2026, 12)).toEqual({
+      desde: '2026-12-01T05:00:00.000Z',
+      hasta: '2027-01-01T05:00:00.000Z',
+    })
+  })
+
+  it('es medio abierto: el inicio del mes siguiente no pertenece al mes', () => {
+    expect(rangoMesZona(2026, 10).hasta).toBe(rangoMesZona(2026, 11).desde)
+  })
+})
+
+describe('desplazarMes', () => {
+  it('avanza y retrocede un mes', () => {
+    expect(desplazarMes(2026, 10, 1)).toEqual({ anio: 2026, mes: 11 })
+    expect(desplazarMes(2026, 10, -1)).toEqual({ anio: 2026, mes: 9 })
+  })
+
+  it('cruza fin de año en ambos sentidos', () => {
+    expect(desplazarMes(2026, 12, 1)).toEqual({ anio: 2027, mes: 1 })
+    expect(desplazarMes(2026, 1, -1)).toEqual({ anio: 2025, mes: 12 })
+  })
+})
+
+describe('diasEnMes', () => {
+  it('devuelve la cantidad correcta de días, incluido febrero bisiesto', () => {
+    expect(diasEnMes(2026, 10)).toBe(31)
+    expect(diasEnMes(2026, 11)).toBe(30)
+    expect(diasEnMes(2026, 2)).toBe(28)
+    expect(diasEnMes(2028, 2)).toBe(29)
+  })
+})
+
+describe('diaSemanaPrimerDia', () => {
+  it('devuelve 0 para domingo y 4 para jueves', () => {
+    // 1 de noviembre de 2026 es domingo; 1 de octubre de 2026 es jueves.
+    expect(diaSemanaPrimerDia(2026, 11)).toBe(0)
+    expect(diaSemanaPrimerDia(2026, 10)).toBe(4)
+  })
+})
+
+describe('anioMesDe', () => {
+  it('extrae año y mes de una fecha aaaa-mm-dd', () => {
+    expect(anioMesDe('2026-10-27')).toEqual({ anio: 2026, mes: 10 })
   })
 })

@@ -52,7 +52,7 @@ export default defineConfig({
     },
     {
       name: 'con-mock',
-      testMatch: /(catalogo|cuentas|productos)\.spec\.ts/,
+      testMatch: /(catalogo|cuentas|productos|calendario)\.spec\.ts/,
       use: { baseURL: `http://localhost:${PUERTO_CON_MOCK}` },
     },
   ],

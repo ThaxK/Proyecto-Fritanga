@@ -15,6 +15,14 @@ export interface CuentaFalsa {
   creada_el: string
 }
 
+export interface VentaFalsa {
+  id: number
+  creada_el: string
+  total_cop: number
+  tipo: string
+  cuenta_id: number | null
+}
+
 export interface EstadoDeSupabaseFalso {
   /** Con turno abierto, App entra a "Venta"; sin turno, a "Apertura de turno". */
   turnoAbierto?: boolean
@@ -22,6 +30,8 @@ export interface EstadoDeSupabaseFalso {
   cuentas?: CuentaFalsa[]
   /** Una fila de venta por cada número: el largo da los ítems y la suma el total. */
   totalesPorCuenta?: Record<number, number[]>
+  /** Ventas para consultas por fecha (calendario, reportes, historial). */
+  ventas?: VentaFalsa[]
   /** Respuesta de cada función RPC, por nombre. */
   rpc?: Record<string, unknown | ((cuerpo: Record<string, unknown>) => unknown)>
 }
@@ -64,13 +74,17 @@ function filasDeLaTabla(
 
     case 'venta': {
       const cuentaId = filtro(params, 'cuenta_id')
-      if (cuentaId === null) return []
-      const totales = estado.totalesPorCuenta?.[Number(cuentaId)] ?? []
-      return totales.map((total) => ({
-        total_cop: total,
-        cuenta_id: Number(cuentaId),
-        tipo: 'cuenta',
-      }))
+      if (cuentaId !== null) {
+        const totales = estado.totalesPorCuenta?.[Number(cuentaId)] ?? []
+        return totales.map((total) => ({
+          total_cop: total,
+          cuenta_id: Number(cuentaId),
+          tipo: 'cuenta',
+        }))
+      }
+      // Consultas por fecha (calendario, reportes, historial): el mock no
+      // filtra por rango, devuelve todas las ventas cargadas en el estado.
+      return estado.ventas ?? []
     }
 
     // El stock se deriva de conteo_inicial, que empieza en cero para cada

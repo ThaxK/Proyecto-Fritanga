@@ -87,6 +87,43 @@ export function rangoDiaZona(fecha: string): { desde: string; hasta: string } {
   }
 }
 
+/** Rango medio abierto `[desde, hasta)` en UTC que cubre el mes (1–12). */
+export function rangoMesZona(anio: number, mes: number): { desde: string; hasta: string } {
+  const primero = `${anio}-${String(mes).padStart(2, '0')}-01`
+  const siguiente = desplazarMes(anio, mes, 1)
+  const primeroSiguiente = `${siguiente.anio}-${String(siguiente.mes).padStart(2, '0')}-01`
+  return {
+    desde: paredEnZonaAUTC(primero, '00:00:00').toISOString(),
+    hasta: paredEnZonaAUTC(primeroSiguiente, '00:00:00').toISOString(),
+  }
+}
+
+/** Desplaza un año/mes en `delta` meses (delta puede ser negativo). */
+export function desplazarMes(
+  anio: number,
+  mes: number,
+  delta: number,
+): { anio: number; mes: number } {
+  const total = anio * 12 + (mes - 1) + delta
+  return { anio: Math.floor(total / 12), mes: ((total % 12) + 12) % 12 + 1 }
+}
+
+/** Cantidad de días del mes (1–12). */
+export function diasEnMes(anio: number, mes: number): number {
+  return new Date(Date.UTC(anio, mes, 0)).getUTCDate()
+}
+
+/** Día de la semana (0=domingo … 6=sábado) del día 1 del mes, en UTC. */
+export function diaSemanaPrimerDia(anio: number, mes: number): number {
+  return new Date(Date.UTC(anio, mes - 1, 1)).getUTCDay()
+}
+
+/** Año y mes (1–12) de una fecha `aaaa-mm-dd`. */
+export function anioMesDe(fecha: string): { anio: number; mes: number } {
+  const [anio, mes] = fecha.split('-').map(Number)
+  return { anio, mes }
+}
+
 /** Fecha (`aaaa-mm-dd`) de HOY según la zona del negocio. */
 export function fechaHoyZona(instante: Date = new Date()): string {
   const p = leerPartes(instante, { year: 'numeric', month: '2-digit', day: '2-digit' })

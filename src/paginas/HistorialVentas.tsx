@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, supabaseConfigurado } from '../servicios/supabase'
+import CalendarioVentas from '../componentes/CalendarioVentas'
 import {
   fechaHoyZona,
   horaMinutoEnZona,
@@ -217,11 +218,9 @@ export default function HistorialVentas() {
           >
             Ayer
           </button>
-          <input
-            type="date"
-            value={fechaSeleccionada}
-            onChange={e => setFechaSeleccionada(e.target.value)}
-            className="ml-2 rounded-xl border-2 border-neutral-300 bg-white px-3 py-2 text-base focus:border-orange-500 focus:outline-none"
+          <CalendarioVentas
+            fechaSeleccionada={fechaSeleccionada}
+            onSeleccionar={setFechaSeleccionada}
           />
         </div>
       </header>

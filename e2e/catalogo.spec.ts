@@ -4,6 +4,9 @@ import { fingirSupabase } from './apoyo/supabase-falso.ts'
 /**
  * Verifica que la pantalla de apertura consuma de verdad lo que devuelve la
  * base: si el nombre de la tabla o de las columnas cambiara, esto se cae.
+ *
+ * Sin turno abierto la app entra a Reportes; para ver la apertura hay que
+ * navegar al botón "Turno" de la barra superior.
  */
 test('la apertura de turno lista el catálogo que devuelve la base', async ({ page }) => {
   await fingirSupabase(page, {
@@ -14,6 +17,7 @@ test('la apertura de turno lista el catálogo que devuelve la base', async ({ pa
   })
 
   await page.goto('/')
+  await page.getByRole('button', { name: /Turno/ }).click()
 
   await expect(page.getByText('Empanadas')).toBeVisible()
   await expect(page.getByText('$2.000')).toBeVisible()
@@ -25,6 +29,7 @@ test('con el catálogo vacío la pantalla igual resuelve, no queda girando', asy
   await fingirSupabase(page, { productos: [] })
 
   await page.goto('/')
+  await page.getByRole('button', { name: /Turno/ }).click()
 
   await expect(page.getByRole('heading', { name: /Apertura de turno/ })).toBeVisible()
   await expect(page.getByText('Empanadas')).toHaveCount(0)
